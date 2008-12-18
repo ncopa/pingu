@@ -6,6 +6,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "pingu.h"
+
+int pingu_verbose = 0;
+
 struct provider {
 	char *name;
 	char *interface;
@@ -39,16 +43,7 @@ char *xstrdup(const char *str)
 	return s;
 }
 
-void log_error(const char *str)
-{
-	if (errno) {
-		/* TODO send to syslog */
-		fprintf(stderr, "%s: %s\n", str, strerror(errno));
-	} else {
-		fprintf(stderr, "%s\n", str);
-	}
-}
-
+#if 0
 int skip(char **str, int whitespace)
 {
 	char *
@@ -57,6 +52,8 @@ int skip(char **str, int whitespace)
 			return;
 		p++;
 	}
+}
+#endif
 
 /* note: this overwrite the line buffer */
 void parse_line(char *line, char **key, char **value)
@@ -108,7 +105,7 @@ struct provider **read_config(const char *file)
 	int i = 0, lineno = 0;
 	char line[256];
 	if (f == NULL) {
-		log_error(file);
+		log_perror(file);
 		return NULL;
 	}
 	while (fgets(line, sizeof(line), f)) {
@@ -120,14 +117,14 @@ struct provider **read_config(const char *file)
 		printf("DEBUG: lineno=%i, key='%s', val='%s'\n", 
 				lineno, key, value);
 
-		if (strcmp(key, "provider") == 0) {
+		if (strcmp(key, "interface") == 0) {
 			list = xrealloc(list, (i + 2) * sizeof(struct provider *));
 			p = xmalloc(sizeof(struct provider));
 			p->name = xstrdup(value);
 			list[i] = p;
 			i++;
-		} else if (p && strcmp(key, "interface") == 0) {
-			p->interface = xstrdup(value);
+		} else if (p && strcmp(key, "provider") == 0) {
+			p->name = xstrdup(value);
 		} else if (p && strcmp(key, "pinghost") == 0) {
 			p->pinghost = xstrdup(value);
 		} else if (p && strcmp(key, "up-action") == 0) {
@@ -135,7 +132,7 @@ struct provider **read_config(const char *file)
 		} else if (p && strcmp(key, "down-action") == 0) {
 			p->down_action = xstrdup(value);
 		} else if (p) {
-			log_error("Unknown keyword");
+			log_error("Unknown keyword '%s' on line %i", key, lineno);
 		} else {
 			log_error("provider not specified");
 		}
