@@ -3,8 +3,9 @@ TARGETS = pingu mtu
 CFLAGS ?= -g
 
 pingu_OBJS = \
+	log.o \
 	pingu.o \
-	log.o
+	xlib.o
 
 mtu_OBJS = \
 	mtu.o

@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "pingu.h"
+#include "xlib.h"
 
 int pingu_verbose = 0;
 
@@ -18,30 +19,6 @@ struct provider {
 	char *down_action;
 	int status;
 };
-
-void *xmalloc(size_t size)
-{
-	void *p = malloc(size);
-	if (p == NULL)
-		err(EXIT_FAILURE, "malloc");
-	return p;
-}
-
-void *xrealloc(void *ptr, size_t size)
-{
-	void *p = realloc(ptr, size);
-	if (p == NULL)
-		err(EXIT_FAILURE, "realloc");
-	return p;
-}
-
-char *xstrdup(const char *str)
-{
-	char *s = strdup(str);
-	if (s == NULL)
-		err(EXIT_FAILURE, "strdup");
-	return s;
-}
 
 #if 0
 int skip(char **str, int whitespace)
