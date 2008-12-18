@@ -1,9 +1,19 @@
 
 #include <err.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+struct provider {
+	char *name;
+	char *interface;
+	char *pinghost;
+	char *up_action;
+	char *down_action;
+	int status;
+};
 
 void *xmalloc(size_t size)
 {
@@ -11,6 +21,127 @@ void *xmalloc(size_t size)
 	if (p == NULL)
 		err(EXIT_FAILURE, "malloc");
 	return p;
+}
+
+void *xrealloc(void *ptr, size_t size)
+{
+	void *p = realloc(ptr, size);
+	if (p == NULL)
+		err(EXIT_FAILURE, "realloc");
+	return p;
+}
+
+char *xstrdup(const char *str)
+{
+	char *s = strdup(str);
+	if (s == NULL)
+		err(EXIT_FAILURE, "strdup");
+	return s;
+}
+
+void log_error(const char *str)
+{
+	if (errno) {
+		/* TODO send to syslog */
+		fprintf(stderr, "%s: %s\n", str, strerror(errno));
+	} else {
+		fprintf(stderr, "%s\n", str);
+	}
+}
+
+int skip(char **str, int whitespace)
+{
+	char *
+	while (isspace(*p)) {
+		if (*p == '\0')
+			return;
+		p++;
+	}
+
+/* note: this overwrite the line buffer */
+void parse_line(char *line, char **key, char **value)
+{
+	char *p;
+
+	/* strip comments and trailng \n */
+	p = strpbrk(line, "#\n");
+	if (p)
+		*p = '\0';
+
+	(*value) = NULL;
+	if (line[0] == '\0') {
+		(*key) = NULL;
+		return;
+	}
+	
+	/* skip leading whitespace */
+	while (isspace(*p)) {
+		if (*p == '\0')
+			return;
+		p++;
+	}
+	(*key) = line;
+
+	/* find space between keyword and value */
+	p = line;
+	while (!isspace(*p)) {
+		if (*p == '\0')
+			return;
+		p++;
+	}
+	*p++ = '\0';
+
+	/* find value */
+	while (isspace(*p)) {
+		if (*p == '\0')
+			return;
+		p++;
+	}
+	(*value) = p;
+}
+
+struct provider **read_config(const char *file)
+{
+	FILE *f = fopen(file, "r");
+	struct provider *p = NULL;
+	struct provider **list = NULL;
+	int i = 0, lineno = 0;
+	char line[256];
+	if (f == NULL) {
+		log_error(file);
+		return NULL;
+	}
+	while (fgets(line, sizeof(line), f)) {
+		char *key, *value;
+		lineno++;
+		parse_line(line, &key, &value);
+		if (key == NULL)
+			continue;
+		printf("DEBUG: lineno=%i, key='%s', val='%s'\n", 
+				lineno, key, value);
+
+		if (strcmp(key, "provider") == 0) {
+			list = xrealloc(list, (i + 2) * sizeof(struct provider *));
+			p = xmalloc(sizeof(struct provider));
+			p->name = xstrdup(value);
+			list[i] = p;
+			i++;
+		} else if (p && strcmp(key, "interface") == 0) {
+			p->interface = xstrdup(value);
+		} else if (p && strcmp(key, "pinghost") == 0) {
+			p->pinghost = xstrdup(value);
+		} else if (p && strcmp(key, "up-action") == 0) {
+			p->up_action = xstrdup(value);
+		} else if (p && strcmp(key, "down-action") == 0) {
+			p->down_action = xstrdup(value);
+		} else if (p) {
+			log_error("Unknown keyword");
+		} else {
+			log_error("provider not specified");
+		}
+	}
+	list[i] = NULL;
+	return list;
 }
 
 static int ping(const char *host)
@@ -45,14 +176,19 @@ void ping_loop(char *hosts[], int offline[], int count, int interval)
 int main(int argc, char *argv[])
 {
 	int c;
+	char *config = "/etc/pingu.conf";
 	char **hosts;
 	int *offline;
 	int hosts_count;
 	int interval = 30;
 	const char *script = NULL;
+	struct provider **providers;
 
-	while ((c = getopt(argc, argv, "i:s:")) != -1) {
+	while ((c = getopt(argc, argv, "c:i:s:")) != -1) {
 		switch (c) {
+		case 'c':
+			config = optarg;
+			break;
 		case 's':
 			script = optarg;
 			break;
@@ -64,6 +200,10 @@ int main(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
+
+	providers = read_config(config);
+	if (providers == NULL)
+		return 1;
 
 	if (argc == 0)
 		usage(EXIT_FAILURE);
