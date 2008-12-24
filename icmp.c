@@ -260,8 +260,7 @@ int icmp_send_frag_needed(int fd, struct sockaddr *to, int tolen,
 	icp->un.frag.mtu = htons(newmtu);
 
 	/* copy ip header + 64-bits of original packet */
-	memcpy(&packet[sizeof(struct icmphdr)], iph,
-	       sizeof(struct iphdr) + 8);
+	memcpy(icp + 1, iph, sizeof(struct iphdr) + 8);
 
 	icp->checksum = in_cksum((u_short *) icp, len, 0);
 
@@ -275,7 +274,7 @@ int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 		   int seq, int total_size)
 {
 	struct sockaddr_in *to_in = (struct sockaddr_in *) to;
-	char packet[1500];
+	__u8 packet[1500];
 	struct icmphdr *icp;
 	int len;
 
@@ -285,6 +284,7 @@ int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 		total_size = sizeof(struct iphdr) + sizeof(struct icmphdr);
 
 	len = total_size - sizeof(struct iphdr);
+	memset(packet, 0, sizeof(packet));
 
 	icp = (struct icmphdr *) packet;
 	icp->type = ICMP_ECHO;

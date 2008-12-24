@@ -93,9 +93,9 @@ static void do_inject(void)
 	struct sockaddr_in from;
 	int len, seq = 0;
 
+	icmp_send_ping(fd, (struct sockaddr *) &to, sizeof(to),
+		       ++seq, mtu_size);
 	for (;;) {
-		icmp_send_ping(fd, (struct sockaddr *) &to, sizeof(to),
-			       ++seq, mtu_size);
 		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
 					   sizeof(from),
 					   buf, sizeof(buf))) <= 0)
@@ -106,9 +106,13 @@ static void do_inject(void)
 				     (struct sockaddr *) &to))
 			continue;
 
+		if (seq != 1)
+			sleep(1);
+
+		icmp_send_ping(fd, (struct sockaddr *) &to, sizeof(to),
+			       ++seq, mtu_size);
 		icmp_send_frag_needed(fd, (struct sockaddr *) &to, sizeof(to),
 				      (struct iphdr *) buf, mtu_size - 2);
-		sleep(1);
 	}
 }
 
