@@ -8,7 +8,8 @@ pingu_OBJS = \
 	xlib.o
 
 mtu_OBJS = \
-	mtu.o
+	mtu.o \
+	icmp.o
 
 ALL_OBJS= $(pingu_OBJS) $(mtu_OBJS)
 
