@@ -220,16 +220,21 @@ out:
 	return ret;
 }
 
-int netlink_route_get(struct sockaddr *dst, u_int16_t *mtu)
+int netlink_route_get(struct sockaddr *dst, u_int16_t *mtu, char *ifname)
 {
 	struct {
 		struct nlmsghdr 	n;
-		struct rtmsg 		r;
+		union {
+			struct rtmsg		r;
+			struct ifinfomsg	i;
+		};
 		char   			buf[1024];
 	} req;
 	struct rtmsg *r = NLMSG_DATA(&req.n);
 	struct rtattr *rta[RTA_MAX+1];
 	struct rtattr *rtax[RTAX_MAX+1];
+	struct rtattr *ifla[IFLA_MAX+1];
+	int index;
 
 	memset(&req, 0, sizeof(req));
 	req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -243,15 +248,44 @@ int netlink_route_get(struct sockaddr *dst, u_int16_t *mtu)
 	if (!netlink_talk(&req.n, sizeof(req), &req.n))
 		return FALSE;
 
-	netlink_parse_rtattr(rta, RTA_MAX, RTM_RTA(r), RTM_PAYLOAD(&req.n));
-	if (rta[RTA_METRICS] == NULL)
-		return FALSE;
+	netlink_parse_rtattr(rta, RTA_MAX, RTM_RTA(r),
+			     RTM_PAYLOAD(&req.n));
 
-	netlink_parse_rtattr(rtax, RTAX_MAX, RTA_DATA(rta[RTA_METRICS]),
-			     RTA_PAYLOAD(rta[RTA_METRICS]));
-	if (rtax[RTAX_MTU] == NULL)
-		return FALSE;
+	if (mtu != NULL) {
+		if (rta[RTA_METRICS] == NULL)
+			return FALSE;
 
-	*mtu = *(int*) RTA_DATA(rtax[RTAX_MTU]);
+		netlink_parse_rtattr(rtax, RTAX_MAX,
+				     RTA_DATA(rta[RTA_METRICS]),
+				     RTA_PAYLOAD(rta[RTA_METRICS]));
+		if (rtax[RTAX_MTU] == NULL)
+			return FALSE;
+
+		*mtu = *(int*) RTA_DATA(rtax[RTAX_MTU]);
+	}
+
+	if (ifname != NULL) {
+		if (rta[RTA_OIF] == NULL)
+			return FALSE;
+
+		index = *(int*) RTA_DATA(rta[RTA_OIF]);
+
+		memset(&req, 0, sizeof(req));
+		req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+		req.n.nlmsg_flags = NLM_F_REQUEST;
+		req.n.nlmsg_type = RTM_GETLINK;
+		req.i.ifi_index = index;
+		if (!netlink_talk(&req.n, sizeof(req), &req.n))
+			return FALSE;
+
+		netlink_parse_rtattr(ifla, IFLA_MAX, IFLA_RTA(r),
+				     IFLA_PAYLOAD(&req.n));
+		if (ifla[IFLA_IFNAME] == NULL)
+			return FALSE;
+
+		memcpy(ifname, RTA_DATA(ifla[IFLA_IFNAME]),
+		       RTA_PAYLOAD(ifla[IFLA_IFNAME]));
+	}
+
 	return TRUE;
 }

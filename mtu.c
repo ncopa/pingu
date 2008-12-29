@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <linux/if.h>
+#include <linux/sockios.h>
 #include <netinet/ip_icmp.h>
 
 #include "icmp.h"
@@ -17,7 +19,8 @@ static void usage(void)
 	fprintf(stderr,
 		"usage: mtu -i <mtu-size> <host>\n"
 		"       mtu -I <host>\n"
-		"       mtu -d <host>\n");
+		"       mtu -d <host>\n"
+		"       mtu -D <host>\n");
 	exit(3);
 }
 
@@ -58,16 +61,14 @@ static int do_ping(int seq, int size)
 	return -1;
 }
 
-static void do_discover(void)
+static int discover_mtu(void)
 {
 	int seq = 1;
 	int low_mtu, high_mtu, try_mtu;
 
 	/* Check if the host is up */
-	if (do_ping(seq++, 0) < 0) {
-		fprintf(stderr, "Host is not up\n");
-		return;
-	}
+	if (do_ping(seq++, 0) < 0)
+		return -1;
 
 	/* Check if there is no PMTU or if PMTU discovery works */
 	low_mtu = do_ping(seq++, 1500);
@@ -85,7 +86,59 @@ static void do_discover(void)
 		low_mtu = 1500;
 	}
 
-	fprintf(stdout, "%d\n", low_mtu);
+	return low_mtu;
+}
+
+static void do_discover(void)
+{
+	int mtu;
+
+	mtu = discover_mtu();
+	if (mtu > 0)
+		fprintf(stdout, "%d\n", mtu);
+	else
+		fprintf(stderr, "Host is not up\n");
+}
+
+static int set_mtu(const char *dev, int mtu)
+{
+	struct ifreq ifr;
+	int fd;
+
+	fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (fd < 0)
+		return -1;
+
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+	ifr.ifr_mtu = mtu;
+	if (ioctl(fd, SIOCSIFMTU, &ifr) < 0) {
+		perror("SIOCSIFMTU");
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	return 0; 
+}
+
+static void do_discover_and_write(void)
+{
+	int mtu;
+	char iface[IFNAMSIZ];
+
+	mtu = discover_mtu();
+	if (mtu < 0) {
+		fprintf(stderr, "Failed to determine MTU\n");
+		return;
+	}
+
+	if (!netlink_route_get(&to, NULL, iface)) {
+		fprintf(stderr, "Failed to determine route interface\n");
+		return;
+	}
+
+	printf("Writing %d to %s\n", mtu, iface);
+	set_mtu(iface, mtu);
 }
 
 static void do_inject(void)
@@ -121,7 +174,7 @@ static void do_inject_pmtu(void)
 {
 	u_int16_t mtu;
 
-	if (netlink_route_get(&to, &mtu) < 0) {
+	if (!netlink_route_get(&to, &mtu, NULL)) {
 		fprintf(stderr, "Failed to determine Path MTU\n");
 		return;
 	}
@@ -139,8 +192,11 @@ int main(int argc, char **argv)
 	char *target;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "dIi:")) != -1) {
+	while ((opt = getopt(argc, argv, "DdIi:")) != -1) {
 		switch (opt) {
+		case 'D':
+			action = do_discover_and_write;
+			break;
 		case 'd':
 			action = do_discover;
 			break;
