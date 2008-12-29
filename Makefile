@@ -9,6 +9,7 @@ pingu_OBJS = \
 
 mtu_OBJS = \
 	mtu.o \
+	netlink.o \
 	icmp.o
 
 ALL_OBJS= $(pingu_OBJS) $(mtu_OBJS)

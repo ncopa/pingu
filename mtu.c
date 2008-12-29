@@ -16,6 +16,7 @@ static void usage(void)
 {
 	fprintf(stderr,
 		"usage: mtu -i <mtu-size> <host>\n"
+		"       mtu -I <host>\n"
 		"       mtu -d <host>\n");
 	exit(3);
 }
@@ -91,11 +92,11 @@ static void do_inject(void)
 {
 	__u8 buf[1500];
 	struct sockaddr_in from;
-	int len, seq = 0;
+	int len, i, seq = 0;
 
 	icmp_send_ping(fd, (struct sockaddr *) &to, sizeof(to),
 		       ++seq, mtu_size);
-	for (;;) {
+	for (i = 0; i < 5; i++) {
 		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
 					   sizeof(from),
 					   buf, sizeof(buf))) <= 0)
@@ -116,6 +117,21 @@ static void do_inject(void)
 	}
 }
 
+static void do_inject_pmtu(void)
+{
+	u_int16_t mtu;
+
+	if (netlink_route_get(&to, &mtu) < 0) {
+		fprintf(stderr, "Failed to determine Path MTU\n");
+		return;
+	}
+	if (mtu == 1500)
+		return;
+
+	mtu_size = mtu;
+	do_inject();
+}
+
 int main(int argc, char **argv)
 {
 	struct hostent *hp;
@@ -123,7 +139,7 @@ int main(int argc, char **argv)
 	char *target;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "di:")) != -1) {
+	while ((opt = getopt(argc, argv, "dIi:")) != -1) {
 		switch (opt) {
 		case 'd':
 			action = do_discover;
@@ -131,6 +147,9 @@ int main(int argc, char **argv)
 		case 'i':
 			action = do_inject;
 			mtu_size = atoi(optarg);
+			break;
+		case 'I':
+			action = do_inject_pmtu;
 			break;
 		default:
 			usage();
