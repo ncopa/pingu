@@ -20,7 +20,13 @@ static void usage(void)
 		"usage: mtu -i <mtu-size> <host>\n"
 		"       mtu -I <host>\n"
 		"       mtu -d <host>\n"
-		"       mtu -D <host>\n");
+		"       mtu -D <host>\n"
+		"\n"
+		" -i <mtu-size>   Inject <mtu-size> as PMTU to <host>\n"
+		" -I              Inject local PMTU as PMTU to <host>\n"
+		" -d              Discover PMTU to <host>\n"
+		" -D              Discover PMTU to <host> and assign it to interface MTU\n"
+		"\n");
 	exit(3);
 }
 
