@@ -293,10 +293,10 @@ int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 	icp->un.echo.sequence = htons(seq);
 	icp->un.echo.id = getpid();
 	icp->checksum = in_cksum((u_short *) icp, len, 0);
-
+#if 0
 	printf("To %s: icmp_seq=%u bytes=%d\n",
 	       pr_addr(to_in->sin_addr.s_addr), seq, len);
-
+#endif
 	return icmp_send(fd, to, tolen, (void *) packet, len);
 }
 
