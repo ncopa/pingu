@@ -1,5 +1,5 @@
 
-TARGETS = mtu
+TARGETS = mtu pingu
 CFLAGS ?= -g
 
 prefix = /usr
@@ -10,6 +10,7 @@ INSTALL = install
 INSTALLDIR = $(INSTALL) -d
 
 pingu_OBJS = \
+	icmp.o \
 	log.o \
 	pingu.o \
 	xlib.o

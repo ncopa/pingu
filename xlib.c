@@ -1,4 +1,9 @@
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -27,5 +32,19 @@ char *xstrdup(const char *str)
 	if (s == NULL)
 		err(EXIT_FAILURE, "strdup");
 	return s;
+}
+
+int init_sockaddr(struct sockaddr_in *addr, const char *host)
+{
+	memset((char *) addr, 0, sizeof(struct sockaddr_in));
+	addr->sin_family = AF_INET;
+	if (inet_aton(host, &addr->sin_addr) == 0) {
+		struct hostent *hp;		
+		hp = gethostbyname(host);
+		if (!hp) 
+			return -1;
+		memcpy(&addr->sin_addr, hp->h_addr, 4);
+	}
+	return 0;
 }
 

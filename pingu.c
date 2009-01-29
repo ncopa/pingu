@@ -1,20 +1,32 @@
 
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include <sys/queue.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#include "icmp.h"
 #include "pingu.h"
 #include "xlib.h"
 
-int pingu_verbose = 0;
+#define DEFAULT_CONFIG "/etc/pingu.conf"
+#define DEFAULT_PIDFILE "/var/run/pingu.pid"
+
+int pingu_verbose = 0, pid_file_fd = 0;
+char *pid_file = DEFAULT_PIDFILE;
+int interval = 30;
 
 struct provider {
-	char *router;
+	struct sockaddr_in address;
 	char *name;
 	char *interface;
 	char *up_action;
@@ -95,13 +107,14 @@ int read_config(const char *file, struct provider_list *head)
 		parse_line(line, &key, &value);
 		if (key == NULL)
 			continue;
-//		printf("DEBUG: lineno=%i, key='%s', val='%s'\n", 
-//				lineno, key, value);
 
-		if (strcmp(key, "router") == 0) {
+		if (p == NULL && strcmp(key, "interval") == 0) {
+			interval = atoi(value);
+		} else if (strcmp(key, "router") == 0) {
 			p = xmalloc(sizeof(struct provider));
 			memset(p, 0, sizeof(struct provider));
-			p->router = xstrdup(value);
+			if (init_sockaddr(&p->address, value) < 0)
+				return 1;
 			p->status = 1; /* online by default */
 			SLIST_INSERT_HEAD(head, p, provider_list);
 		} else if (p && strcmp(key, "interface") == 0) {
@@ -121,19 +134,50 @@ int read_config(const char *file, struct provider_list *head)
 	return 0;
 }
 
-static int ping(const char *host)
+int do_ping(struct sockaddr_in *to, int seq, int retries)
 {
-	char cmd[280];
-	snprintf(cmd, sizeof(cmd), "ping -c 1 -q %s >/dev/null 2>&1", host);
-	return system(cmd);
+	__u8 buf[1500];
+	struct iphdr *ip = (struct iphdr *) buf;
+	struct icmphdr *icp;
+	struct sockaddr_in from;
+	int retry;
+	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
+	int fd = icmp_open();
+
+	for (retry = 0; retry < retries; retry++) {
+		icmp_send_ping(fd, (struct sockaddr *) to, sizeof(*to),
+			       seq, len);
+
+		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
+					   sizeof(from), buf, sizeof(buf))) <= 0)
+			continue;
+
+		icp = (struct icmphdr *) &buf[ip->ihl * 4];
+		if (icp->type == ICMP_ECHOREPLY && icp->un.echo.id == getpid()) {
+			icmp_close(fd);
+			return 0;
+		}
+	}
+	icmp_close(fd);
+	return -1;
 }
 
-void usage(int retcode)
+int usage(const char *program)
 {
-	fprintf(stderr, "usage:\n");
-	exit(retcode);
+	fprintf(stderr, "usage: %s [-dh] [-c CONFIG] [-p PIDFILE]\n"
+		"options:\n"
+       		" -c  Read configuration from FILE (default is " 
+			DEFAULT_CONFIG ")\n"
+		" -d  Debug mode. Stay in foreground\n"
+		" -h  Show this help\n"
+		" -p  Use PIDFILE as pidfile (default is " 
+			DEFAULT_PIDFILE ")\n"
+		"\n",
+		program);
+	return 1;
 }
 
+#if 0
 void dump_provider(struct provider *p)
 {		
 	printf("router:      %s\n"
@@ -143,47 +187,111 @@ void dump_provider(struct provider *p)
 	       "down-action: %s\n"
 	       "p->status:   %i\n"
 	       "\n",
-	       p->router, p->name, p->interface,
+	       inet_ntoa(p->address.sin_addr), p->name, p->interface,
 	       p->up_action, p->down_action, p->status);
 }
+#endif
+
+
 
 void ping_loop(struct provider_list *head, int interval)
 {
 	struct provider *p;
+	int seq = 0;
 	while (1) {
+		seq++;
 		SLIST_FOREACH(p, head, provider_list) {
-			int status = (ping(p->router) != 0);
+			int status = (do_ping(&p->address, seq, 3) == 0);
 			if (status != p->status) {
 				p->status = status;
-				printf("status changed for %s to %i\n",
-					p->router, status);
+				if (status)
+					system(p->up_action);
+				else
+					system(p->down_action);
 			}
 		}
 		sleep(interval);
+		seq &= 0xffff;
 	}
+}
+
+static void remove_pid_file(void)
+{
+	if (pid_file_fd != 0) {
+		close(pid_file_fd);
+		pid_file_fd = 0;
+		remove(pid_file);
+	}
+}
+
+static int daemonize(void)
+{
+	char tmp[16];
+	pid_t pid;
+
+	pid = fork();
+	if (pid < 0)
+		return -1;
+	if (pid > 0)
+		exit(0);
+
+	if (setsid() < 0)
+		return -1;
+
+	pid = fork();
+	if (pid < 0)
+		return -1;
+	if (pid > 0)
+		exit(0);
+
+	if (chdir("/") < 0)
+		return -1;
+
+	pid_file_fd = open(pid_file, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+	if (pid_file_fd < 0) {
+		log_error("Unable to open %s: %s.", pid_file, strerror(errno));
+		return -1;
+	}
+
+	if (flock(pid_file_fd, LOCK_EX | LOCK_NB) < 0) {
+		log_error("Unable to lock pid file (already running?).");
+		close(pid_file_fd);
+		pid_file_fd = 0;
+		return -1;
+	}
+
+	ftruncate(pid_file_fd, 0);
+	write(pid_file_fd, tmp, sprintf(tmp, "%d\n", getpid()));
+	atexit(remove_pid_file);
+
+	freopen("/dev/null", "r", stdin);
+	freopen("/dev/null", "w", stdout);
+	freopen("/dev/null", "w", stderr);
+
+	umask(0);
+
+	return 0;
 }
 
 int main(int argc, char *argv[])
 {
-	int c;
-	char *config = "/etc/pingu.conf";
-	char **hosts;
-	int *offline;
-	int hosts_count;
-	int interval = 30;
-	const char *script = NULL;
+	int c, debug_mode = 0;
 	struct provider_list providers;
+	char *config_file = DEFAULT_CONFIG;
 
-	while ((c = getopt(argc, argv, "c:i:s:")) != -1) {
+	while ((c = getopt(argc, argv, "c:dhp:")) != -1) {
 		switch (c) {
 		case 'c':
-			config = optarg;
+			config_file = optarg;
 			break;
-		case 's':
-			script = optarg;
+		case 'd':
+			debug_mode++;
 			break;
-		case 'i':
-			interval = atoi(optarg);
+		case 'h':
+			return usage(basename(argv[0]));
+			return;
+		case 'p':
+			pid_file = optarg;
 			break;
 		}
 	}
@@ -192,17 +300,15 @@ int main(int argc, char *argv[])
 	argv += optind;
 
 	SLIST_INIT(&providers);
-	if (read_config(config, &providers) == -1)
+	if (read_config(config_file, &providers) == -1)
 		return 1;
 
-//	if (argc == 0)
-//		usage(EXIT_FAILURE);
-
-	offline = xmalloc(sizeof(int) * argc);
-	memset(offline, 0, sizeof(int) * argc);
+	if (!debug_mode) {
+		if (daemonize() == -1)
+			return 1;
+	}
 
 	ping_loop(&providers, interval);
 
-	free(hosts);
 	return 0;
 }
