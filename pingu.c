@@ -21,9 +21,13 @@
 #define DEFAULT_CONFIG "/etc/pingu.conf"
 #define DEFAULT_PIDFILE "/var/run/pingu.pid"
 
-int pingu_verbose = 0, pid_file_fd = 0;
+int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
 char *pid_file = DEFAULT_PIDFILE;
 int interval = 30;
+float default_timeout = 1.0;
+int default_retry = 3;
+char *default_up_action = NULL;
+char *default_down_action = NULL;
 
 struct provider {
 	struct sockaddr_in address;
@@ -32,6 +36,8 @@ struct provider {
 	char *up_action;
 	char *down_action;
 	int status;
+	int retry;
+	float timeout;
 	SLIST_ENTRY(provider) provider_list;
 };
 
@@ -108,33 +114,53 @@ int read_config(const char *file, struct provider_list *head)
 		if (key == NULL)
 			continue;
 
-		if (p == NULL && strcmp(key, "interval") == 0) {
-			interval = atoi(value);
-		} else if (strcmp(key, "router") == 0) {
+		if (strcmp(key, "host") == 0) {
 			p = xmalloc(sizeof(struct provider));
 			memset(p, 0, sizeof(struct provider));
 			if (init_sockaddr(&p->address, value) < 0)
 				return 1;
 			p->status = 1; /* online by default */
+			p->retry = default_retry;
+			p->timeout = default_timeout;
+			p->up_action = default_up_action;
+			p->down_action = default_down_action;
 			SLIST_INSERT_HEAD(head, p, provider_list);
-		} else if (p && strcmp(key, "interface") == 0) {
+			continue;
+		}
+		if (p == NULL) {
+			if (strcmp(key, "interval") == 0) {
+				interval = atoi(value);
+			} else if (strcmp(key, "retry") == 0) {
+				default_retry = atoi(value);
+			} else if (strcmp(key, "timeout") == 0) {
+				default_timeout = atof(value);
+			} else if (strcmp(key, "up-action") == 0) {
+				default_up_action = value;
+			} else if (strcmp(key, "down-action") == 0) {
+				default_down_action = value;
+			} else 
+				log_error("host not specified");
+		} else if (strcmp(key, "interface") == 0) {
 			p->interface = xstrdup(value);
-		} else if (p && strcmp(key, "provider") == 0) {
+		} else if (strcmp(key, "name") == 0) {
 			p->name = xstrdup(value);
-		} else if (p && strcmp(key, "up-action") == 0) {
+		} else if (strcmp(key, "up-action") == 0) {
 			p->up_action = xstrdup(value);
-		} else if (p && strcmp(key, "down-action") == 0) {
+		} else if (strcmp(key, "down-action") == 0) {
 			p->down_action = xstrdup(value);
-		} else if (p) {
-			log_error("Unknown keyword '%s' on line %i", key, lineno);
+		} else if (strcmp(key, "retry") == 0) {
+			p->retry = atoi(value);
+		} else if (strcmp(key, "timeout") == 0) {
+			p->timeout = atof(value);
 		} else {
-			log_error("provider not specified");
+			log_error("Unknown keyword '%s' on line %i", key,
+				  lineno);
 		}
 	}
 	return 0;
 }
 
-int do_ping(struct sockaddr_in *to, int seq, int retries)
+int do_ping(struct sockaddr_in *to, int seq, int retries, float timeout)
 {
 	__u8 buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
@@ -142,7 +168,7 @@ int do_ping(struct sockaddr_in *to, int seq, int retries)
 	struct sockaddr_in from;
 	int retry;
 	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
-	int fd = icmp_open();
+	int fd = icmp_open(timeout);
 
 	for (retry = 0; retry < retries; retry++) {
 		icmp_send_ping(fd, (struct sockaddr *) to, sizeof(*to),
@@ -168,7 +194,7 @@ int usage(const char *program)
 		"options:\n"
        		" -c  Read configuration from FILE (default is " 
 			DEFAULT_CONFIG ")\n"
-		" -d  Debug mode. Stay in foreground\n"
+		" -d  Fork to background (damonize)\n"
 		" -h  Show this help\n"
 		" -p  Use PIDFILE as pidfile (default is " 
 			DEFAULT_PIDFILE ")\n"
@@ -201,7 +227,7 @@ void ping_loop(struct provider_list *head, int interval)
 	while (1) {
 		seq++;
 		SLIST_FOREACH(p, head, provider_list) {
-			int status = (do_ping(&p->address, seq, 3) == 0);
+			int status = (do_ping(&p->address, seq, 2, 0.3) == 0);
 			if (status != p->status) {
 				p->status = status;
 				if (status)
@@ -285,7 +311,7 @@ int main(int argc, char *argv[])
 			config_file = optarg;
 			break;
 		case 'd':
-			debug_mode++;
+			pingu_daemonize++;
 			break;
 		case 'h':
 			return usage(basename(argv[0]));
@@ -303,7 +329,7 @@ int main(int argc, char *argv[])
 	if (read_config(config_file, &providers) == -1)
 		return 1;
 
-	if (!debug_mode) {
+	if (pingu_daemonize) {
 		if (daemonize() == -1)
 			return 1;
 	}

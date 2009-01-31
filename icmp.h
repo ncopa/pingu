@@ -15,7 +15,7 @@ int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 		   int seq, int total_size);
 int icmp_read_reply(int fd, struct sockaddr *from, int fromlen,
 		    __u8 *buf, int buflen);
-int icmp_open(void);
+int icmp_open(float timeout);
 void icmp_close(int fd);
 
 

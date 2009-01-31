@@ -223,7 +223,7 @@ int main(int argc, char **argv)
 
 	target = argv[optind];
 
-	fd = icmp_open();
+	fd = icmp_open(1.0);
 	if (fd < 0)
 		exit(1);
 

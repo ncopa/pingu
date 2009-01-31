@@ -316,7 +316,7 @@ int icmp_read_reply(int fd, struct sockaddr *from, int fromlen,
 	return len;
 }
 
-int icmp_open(void)
+int icmp_open(float timeout)
 {
 	const int pmtudisc = IP_PMTUDISC_DO, yes = 1;
 	struct timeval tv;
@@ -334,12 +334,12 @@ int icmp_open(void)
 		goto err_close;
 	}
 
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
+	tv.tv_sec = (time_t) timeout;
+	tv.tv_usec = (timeout - tv.tv_sec) * 1000000;
 	setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, sizeof(tv));
 
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
+	tv.tv_sec = (time_t) timeout;
+	tv.tv_usec = (timeout - tv.tv_sec) * 1000000;
 	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,
 		       (char*)&tv, sizeof(tv)) == -1)
 		goto err_close;
