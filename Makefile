@@ -1,6 +1,9 @@
 
 TARGETS = mtu pingu
+VERSION = 0.2_pre1
+
 CFLAGS ?= -g
+CFLAGS += -DPINGU_VERSION=\"$(VERSION)\"
 
 prefix = /usr
 BINDIR = $(prefix)/bin

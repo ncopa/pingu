@@ -188,8 +188,14 @@ int do_ping(struct sockaddr_in *to, int seq, int retries, float timeout)
 	return -1;
 }
 
+static void print_version(const char *program)
+{
+	printf("%s " PINGU_VERSION "\n", program);
+}
+
 int usage(const char *program)
 {
+	print_version(program);
 	fprintf(stderr, "usage: %s [-dh] [-c CONFIG] [-p PIDFILE]\n"
 		"options:\n"
        		" -c  Read configuration from FILE (default is " 
@@ -198,6 +204,7 @@ int usage(const char *program)
 		" -h  Show this help\n"
 		" -p  Use PIDFILE as pidfile (default is " 
 			DEFAULT_PIDFILE ")\n"
+		" -V  Print version and exit\n"
 		"\n",
 		program);
 	return 1;
@@ -305,7 +312,7 @@ int main(int argc, char *argv[])
 	struct provider_list providers;
 	char *config_file = DEFAULT_CONFIG;
 
-	while ((c = getopt(argc, argv, "c:dhp:")) != -1) {
+	while ((c = getopt(argc, argv, "c:dhp:V")) != -1) {
 		switch (c) {
 		case 'c':
 			config_file = optarg;
@@ -315,10 +322,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'h':
 			return usage(basename(argv[0]));
-			return;
 		case 'p':
 			pid_file = optarg;
 			break;
+		case 'V':
+			print_version(basename(argv[0]));
+			return 0;
 		}
 	}
 
