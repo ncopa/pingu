@@ -69,30 +69,33 @@ static int do_ping(int seq, int size)
 
 static int discover_mtu(void)
 {
-	int seq = 1;
-	int low_mtu, high_mtu, try_mtu;
+	int seq = 1, low_mtu, high_mtu, try_mtu, r;
 
 	/* Check if the host is up */
 	if (do_ping(seq++, 0) < 0)
 		return -1;
 
-	/* Check if there is no PMTU or if PMTU discovery works */
-	low_mtu = do_ping(seq++, 1500);
-	if (low_mtu == -1) {
-		/* Binary search for working MTU */
-		for (low_mtu = 68/2, high_mtu = 1500/2; low_mtu < high_mtu; ) {
-			try_mtu = low_mtu + (high_mtu - low_mtu + 1) / 2;
-			if (do_ping(seq++, try_mtu * 2) == 0)
-				low_mtu = try_mtu;
-			else
-				high_mtu = try_mtu - 1;
+	/* Discover PMTU */
+	low_mtu = 68/2;
+	high_mtu = 1500/2;
+	try_mtu = 1500/2;
+	while (1) {
+		r = do_ping(seq++, try_mtu * 2);
+		if (r > 0 && r < try_mtu) {
+			/* pmtu */
+			high_mtu = r/2;
+			try_mtu = high_mtu;
+			continue;
 		}
-		low_mtu *= 2;
-	} else if (low_mtu == 0) {
-		low_mtu = 1500;
-	}
+		if (r == 0)
+			low_mtu = try_mtu;
+		else
+			high_mtu = try_mtu - 1;
+		if (low_mtu >= high_mtu)
+			return 2 * low_mtu;
 
-	return low_mtu;
+		try_mtu = low_mtu + (high_mtu - low_mtu + 1) / 2;
+	}
 }
 
 static void do_discover(void)
