@@ -81,7 +81,7 @@ static int discover_mtu(void)
 	try_mtu = 1500/2;
 	while (1) {
 		r = do_ping(seq++, try_mtu * 2);
-		if (r > 0 && r < try_mtu) {
+		if (r > 0 && r < try_mtu * 2) {
 			/* pmtu */
 			high_mtu = r/2;
 			try_mtu = high_mtu;
