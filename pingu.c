@@ -1,8 +1,10 @@
 
+#include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <sys/queue.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 
 #include <err.h>
@@ -28,11 +30,13 @@ float default_timeout = 1.0;
 int default_retry = 3;
 char *default_up_action = NULL;
 char *default_down_action = NULL;
+char *default_route_script = NULL;
 
 struct provider {
 	struct sockaddr_in address;
 	char *name;
 	char *interface;
+	char *gateway;
 	char *up_action;
 	char *down_action;
 	int status;
@@ -135,13 +139,17 @@ int read_config(const char *file, struct provider_list *head)
 			} else if (strcmp(key, "timeout") == 0) {
 				default_timeout = atof(value);
 			} else if (strcmp(key, "up-action") == 0) {
-				default_up_action = value;
+				default_up_action = xstrdup(value);
 			} else if (strcmp(key, "down-action") == 0) {
-				default_down_action = value;
+				default_down_action = xstrdup(value);
+			} else if (strcmp(key, "route-script") == 0) {
+				default_route_script = xstrdup(value);
 			} else 
 				log_error("host not specified");
 		} else if (strcmp(key, "interface") == 0) {
 			p->interface = xstrdup(value);
+		} else if (strcmp(key, "gateway") == 0) {
+			p->gateway = xstrdup(value);
 		} else if (strcmp(key, "name") == 0) {
 			p->name = xstrdup(value);
 		} else if (strcmp(key, "up-action") == 0) {
@@ -225,17 +233,61 @@ void dump_provider(struct provider *p)
 }
 #endif
 
+char *get_provider_gateway(struct provider *p)
+{
+	if (p->gateway != NULL)
+		return p->gateway;
+	return inet_ntoa(p->address.sin_addr);
+}
 
+void exec_route_change(struct provider_list *head)
+{
+	struct provider *p;
+	char **args;
+	int i = 0, status;
+	pid_t pid;
+	SLIST_FOREACH(p, head, provider_list) {
+		i++;
+	}
+	args = xmalloc(sizeof(char *) * (i + 2));
+
+	i = 0;
+	args[i++] = default_route_script;
+	SLIST_FOREACH(p, head, provider_list) {
+		if (p->status)
+			args[i++] = get_provider_gateway(p);
+	}
+	args[i] = NULL;
+	pid = fork();
+	switch (pid) {
+	case -1:
+		log_perror("fork");
+		goto free_and_return;
+		break;
+	case 0:
+		execvp(default_route_script, args);
+		log_perror(args[0]);
+		break;
+	default:
+		wait(&status);
+	}
+
+free_and_return:
+	free(args);
+	return;
+}
 
 void ping_loop(struct provider_list *head, int interval)
 {
 	struct provider *p;
-	int seq = 0;
+	int seq = 0, change;
 	while (1) {
+		change = 0;
 		seq++;
 		SLIST_FOREACH(p, head, provider_list) {
 			int status = (do_ping(&p->address, seq, 2, 0.3) == 0);
 			if (status != p->status) {
+				change++;
 				p->status = status;
 				if (status)
 					system(p->up_action);
@@ -243,6 +295,9 @@ void ping_loop(struct provider_list *head, int interval)
 					system(p->down_action);
 			}
 		}
+		if (change)
+			exec_route_change(head);
+
 		sleep(interval);
 		seq &= 0xffff;
 	}
