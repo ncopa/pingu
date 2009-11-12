@@ -20,8 +20,13 @@
 #include "pingu.h"
 #include "xlib.h"
 
-#define DEFAULT_CONFIG "/etc/pingu.conf"
+#ifndef DEFAULT_CONFIG
+#define DEFAULT_CONFIG "/etc/pingu/pingu.conf"
+#endif
+
+#ifndef DEFAULT_PIDFILE
 #define DEFAULT_PIDFILE "/var/run/pingu.pid"
+#endif
 
 int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
 char *pid_file = DEFAULT_PIDFILE;
