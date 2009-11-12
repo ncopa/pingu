@@ -27,7 +27,8 @@ int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
 char *pid_file = DEFAULT_PIDFILE;
 int interval = 30;
 float default_timeout = 1.0;
-int default_retry = 3;
+int default_retry = 5;
+int default_required_replies = 2;
 char *default_up_action = NULL;
 char *default_down_action = NULL;
 char *default_route_script = NULL;
@@ -41,6 +42,7 @@ struct provider {
 	char *down_action;
 	int status;
 	int retry;
+	int required_replies;
 	float timeout;
 	SLIST_ENTRY(provider) provider_list;
 };
@@ -128,6 +130,7 @@ int read_config(const char *file, struct provider_list *head)
 			p->timeout = default_timeout;
 			p->up_action = default_up_action;
 			p->down_action = default_down_action;
+			p->required_replies = default_required_replies;
 			SLIST_INSERT_HEAD(head, p, provider_list);
 			continue;
 		}
@@ -136,6 +139,8 @@ int read_config(const char *file, struct provider_list *head)
 				interval = atoi(value);
 			} else if (strcmp(key, "retry") == 0) {
 				default_retry = atoi(value);
+			} else if (strcmp(key, "required") == 0) {
+				default_required_replies = atoi(value);
 			} else if (strcmp(key, "timeout") == 0) {
 				default_timeout = atof(value);
 			} else if (strcmp(key, "up-action") == 0) {
@@ -158,6 +163,8 @@ int read_config(const char *file, struct provider_list *head)
 			p->down_action = xstrdup(value);
 		} else if (strcmp(key, "retry") == 0) {
 			p->retry = atoi(value);
+		} else if (strcmp(key, "required") == 0) {
+			p->required_replies = atoi(value);
 		} else if (strcmp(key, "timeout") == 0) {
 			p->timeout = atof(value);
 		} else {
@@ -168,32 +175,39 @@ int read_config(const char *file, struct provider_list *head)
 	return 0;
 }
 
-int do_ping(struct sockaddr_in *to, int seq, int retries, float timeout)
+/* returns true if it get at least required_replies/retries replies */
+int ping_status(struct sockaddr_in *to, int *seq, int retries, 
+			int required_replies, float timeout)
 {
 	__u8 buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
 	struct icmphdr *icp;
 	struct sockaddr_in from;
 	int retry;
+	int replies = 0;
 	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
 	int fd = icmp_open(timeout);
 
-	for (retry = 0; retry < retries; retry++) {
+	for (retry = 0; retry < retries && replies < required_replies; retry++) {
 		icmp_send_ping(fd, (struct sockaddr *) to, sizeof(*to),
-			       seq, len);
-
+			       *seq, len);
+		(*seq)++;
+		(*seq) &= 0xffff;
 		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
 					   sizeof(from), buf, sizeof(buf))) <= 0)
 			continue;
 
 		icp = (struct icmphdr *) &buf[ip->ihl * 4];
 		if (icp->type == ICMP_ECHOREPLY && icp->un.echo.id == getpid()) {
-			icmp_close(fd);
-			return 0;
+			replies++;
 		}
 	}
 	icmp_close(fd);
-	return -1;
+#if 0
+	printf("address=%s, replies=%i, required=%i\n",  
+	       inet_ntoa(to->sin_addr), replies, required_replies);
+#endif
+	return (replies >= required_replies);
 }
 
 static void print_version(const char *program)
@@ -283,9 +297,10 @@ void ping_loop(struct provider_list *head, int interval)
 	int seq = 0, change;
 	while (1) {
 		change = 0;
-		seq++;
 		SLIST_FOREACH(p, head, provider_list) {
-			int status = (do_ping(&p->address, seq, 2, 0.3) == 0);
+			int status;
+			status = ping_status(&p->address, &seq, p->retry,
+					     p->required_replies, p->timeout);
 			if (status != p->status) {
 				change++;
 				p->status = status;
@@ -299,7 +314,7 @@ void ping_loop(struct provider_list *head, int interval)
 			exec_route_change(head);
 
 		sleep(interval);
-		seq &= 0xffff;
+
 	}
 }
 
