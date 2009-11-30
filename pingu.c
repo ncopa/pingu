@@ -265,6 +265,10 @@ void exec_route_change(struct provider_list *head)
 	char **args;
 	int i = 0, status;
 	pid_t pid;
+
+	if (default_route_script == NULL)
+		return;
+
 	SLIST_FOREACH(p, head, provider_list) {
 		i++;
 	}
@@ -286,7 +290,7 @@ void exec_route_change(struct provider_list *head)
 	case 0:
 		execvp(default_route_script, args);
 		log_perror(args[0]);
-		break;
+		exit(1);
 	default:
 		wait(&status);
 	}
