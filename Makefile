@@ -1,6 +1,6 @@
 
 TARGETS = mtu pingu
-VERSION = 0.4
+VERSION = 0.4.1
 
 CFLAGS ?= -g
 CFLAGS += -DPINGU_VERSION=\"$(VERSION)\"
