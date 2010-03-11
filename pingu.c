@@ -39,7 +39,8 @@ char *default_down_action = NULL;
 char *default_route_script = NULL;
 
 struct provider {
-	struct sockaddr_in address;
+	struct sockaddr_in dest_addr;
+	struct sockaddr_in src_addr;
 	char *name;
 	char *interface;
 	char *gateway;
@@ -128,7 +129,7 @@ int read_config(const char *file, struct provider_list *head)
 		if (strcmp(key, "host") == 0) {
 			p = xmalloc(sizeof(struct provider));
 			memset(p, 0, sizeof(struct provider));
-			if (init_sockaddr(&p->address, value) < 0)
+			if (init_sockaddr(&p->dest_addr, value) < 0)
 				return 1;
 			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
@@ -175,6 +176,9 @@ int read_config(const char *file, struct provider_list *head)
 			p->required_replies = atoi(value);
 		} else if (strcmp(key, "timeout") == 0) {
 			p->timeout = atof(value);
+		} else if (strcmp(key, "source-ip") == 0) {
+			if (init_sockaddr(&p->src_addr, value) < 0)
+				return 1;
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  lineno);
@@ -184,8 +188,7 @@ int read_config(const char *file, struct provider_list *head)
 }
 
 /* returns true if it get at least required_replies/retries replies */
-int ping_status(struct sockaddr_in *to, int *seq, int retries, 
-		int required_replies, float timeout, const char *iface)
+int ping_status(struct provider *p, int *seq)
 {
 	__u8 buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
@@ -194,15 +197,24 @@ int ping_status(struct sockaddr_in *to, int *seq, int retries,
 	int retry;
 	int replies = 0;
 	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
-	int fd = icmp_open(timeout);
+	int fd = icmp_open(p->timeout);
 
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface, 
-		       (iface == NULL) ? 0 : strlen(iface)+1) == -1)
+	/* bidn to interface if set */
+	if (p->interface != NULL)
+		if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, p->interface, 
+		    	       strlen(p->interface)+1) == -1)
+			goto close_fd;
+
+	/* set source address */
+	if (bind(fd, (struct sockaddr *)&p->src_addr, sizeof(p->src_addr)) < 0){
+		log_error("bind source address %s: %s",
+			  inet_ntoa(p->src_addr.sin_addr), strerror(errno));
 		goto close_fd;
+	}
 
-	for (retry = 0; retry < retries && replies < required_replies; retry++) {
-		icmp_send_ping(fd, (struct sockaddr *) to, sizeof(*to),
-			       *seq, len);
+	for (retry = 0; retry < p->retry && replies < p->required_replies; retry++) {
+		icmp_send_ping(fd, (struct sockaddr *)&p->dest_addr, 
+			       sizeof(p->dest_addr), *seq, len);
 		(*seq)++;
 		(*seq) &= 0xffff;
 		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
@@ -220,7 +232,7 @@ close_fd:
 	printf("address=%s, replies=%i, required=%i\n",  
 	       inet_ntoa(to->sin_addr), replies, required_replies);
 #endif
-	return (replies >= required_replies);
+	return (replies >= p->required_replies);
 }
 
 static void print_version(const char *program)
@@ -264,7 +276,7 @@ char *get_provider_gateway(struct provider *p)
 {
 	if (p->gateway != NULL)
 		return p->gateway;
-	return inet_ntoa(p->address.sin_addr);
+	return inet_ntoa(p->dest_addr.sin_addr);
 }
 
 void exec_route_change(struct provider_list *head)
@@ -316,9 +328,7 @@ void ping_loop(struct provider_list *head, int interval)
 		change = 0;
 		SLIST_FOREACH(p, head, provider_list) {
 			int status;
-			status = ping_status(&p->address, &seq, p->retry,
-					     p->required_replies, p->timeout,
-					     p->interface);
+			status = ping_status(p, &seq);
 			if (status != p->status) {
 				change++;
 				p->status = status;
