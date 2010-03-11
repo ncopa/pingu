@@ -130,6 +130,7 @@ int read_config(const char *file, struct provider_list *head)
 			memset(p, 0, sizeof(struct provider));
 			if (init_sockaddr(&p->address, value) < 0)
 				return 1;
+			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
 			p->retry = default_retry;
 			p->timeout = default_timeout;
@@ -159,6 +160,8 @@ int read_config(const char *file, struct provider_list *head)
 		} else if (strcmp(key, "interface") == 0) {
 			p->interface = xstrdup(value);
 		} else if (strcmp(key, "gateway") == 0) {
+			if (p->gateway)
+				free(p->gateway);
 			p->gateway = xstrdup(value);
 		} else if (strcmp(key, "name") == 0) {
 			p->name = xstrdup(value);
@@ -182,7 +185,7 @@ int read_config(const char *file, struct provider_list *head)
 
 /* returns true if it get at least required_replies/retries replies */
 int ping_status(struct sockaddr_in *to, int *seq, int retries, 
-			int required_replies, float timeout)
+		int required_replies, float timeout, const char *iface)
 {
 	__u8 buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
@@ -192,6 +195,10 @@ int ping_status(struct sockaddr_in *to, int *seq, int retries,
 	int replies = 0;
 	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
 	int fd = icmp_open(timeout);
+
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface, 
+		       (iface == NULL) ? 0 : strlen(iface)+1) == -1)
+		goto close_fd;
 
 	for (retry = 0; retry < retries && replies < required_replies; retry++) {
 		icmp_send_ping(fd, (struct sockaddr *) to, sizeof(*to),
@@ -207,6 +214,7 @@ int ping_status(struct sockaddr_in *to, int *seq, int retries,
 			replies++;
 		}
 	}
+close_fd:
 	icmp_close(fd);
 #if 0
 	printf("address=%s, replies=%i, required=%i\n",  
@@ -309,7 +317,8 @@ void ping_loop(struct provider_list *head, int interval)
 		SLIST_FOREACH(p, head, provider_list) {
 			int status;
 			status = ping_status(&p->address, &seq, p->retry,
-					     p->required_replies, p->timeout);
+					     p->required_replies, p->timeout,
+					     p->interface);
 			if (status != p->status) {
 				change++;
 				p->status = status;
