@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,8 +40,8 @@ char *default_down_action = NULL;
 char *default_route_script = NULL;
 
 struct provider {
-	struct sockaddr_in dest_addr;
-	struct sockaddr_in src_addr;
+	char *dest_addr;
+	char *src_addr;
 	char *name;
 	char *interface;
 	char *gateway;
@@ -129,8 +130,7 @@ int read_config(const char *file, struct provider_list *head)
 		if (strcmp(key, "host") == 0) {
 			p = xmalloc(sizeof(struct provider));
 			memset(p, 0, sizeof(struct provider));
-			if (init_sockaddr(&p->dest_addr, value) < 0)
-				return 1;
+			p->dest_addr = xstrdup(value);
 			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
 			p->retry = default_retry;
@@ -177,8 +177,7 @@ int read_config(const char *file, struct provider_list *head)
 		} else if (strcmp(key, "timeout") == 0) {
 			p->timeout = atof(value);
 		} else if (strcmp(key, "source-ip") == 0) {
-			if (init_sockaddr(&p->src_addr, value) < 0)
-				return 1;
+			p->src_addr = xstrdup(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  lineno);
@@ -194,37 +193,61 @@ int ping_status(struct provider *p, int *seq)
 	struct iphdr *ip = (struct iphdr *) buf;
 	struct icmphdr *icp;
 	struct sockaddr_in from;
-	int retry;
+	struct addrinfo hints;
+	struct addrinfo *result, *rp;
+
+	int retry, r;
 	int replies = 0;
 	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
 	int fd = icmp_open(p->timeout);
 
-	/* bidn to interface if set */
+	memset(&hints, 0, sizeof(hints));
+
+	/* bind to interface if set */
 	if (p->interface != NULL)
 		if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, p->interface, 
 		    	       strlen(p->interface)+1) == -1)
 			goto close_fd;
 
 	/* set source address */
-	if (bind(fd, (struct sockaddr *)&p->src_addr, sizeof(p->src_addr)) < 0){
-		log_error("bind source address %s: %s",
-			  inet_ntoa(p->src_addr.sin_addr), strerror(errno));
-		goto close_fd;
+	if (p->src_addr != NULL) {
+		r = getaddrinfo(p->src_addr, NULL, NULL, &result);
+		if (r != 0) {
+			log_error("getaddrinfo: %s", gai_strerror(r));
+			goto close_fd;
+		}
+
+		for (rp = result; rp != NULL; rp = rp->ai_next) {
+			r = bind(fd, rp->ai_addr, rp->ai_addrlen);
+			if (r == 0)
+				break;
+		}
 	}
 
-	for (retry = 0; retry < p->retry && replies < p->required_replies; retry++) {
-		icmp_send_ping(fd, (struct sockaddr *)&p->dest_addr, 
-			       sizeof(p->dest_addr), *seq, len);
+	/* get first sockaddr struc that has successful send ping */
+	getaddrinfo(p->dest_addr, NULL, NULL, &result);
+	for (rp = result; rp != NULL; rp = rp->ai_next) {
+		r = icmp_send_ping(fd, rp->ai_addr, rp->ai_addrlen, *seq, len);
+		if (r >= 0)
+			break;
+	}
+	if (rp == NULL)
+		goto close_fd;
+	retry = 0;
+	while (retry < p->retry && replies < p->required_replies) {
+		retry++;
 		(*seq)++;
 		(*seq) &= 0xffff;
-		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
-					   sizeof(from), buf, sizeof(buf))) <= 0)
-			continue;
-
-		icp = (struct icmphdr *) &buf[ip->ihl * 4];
-		if (icp->type == ICMP_ECHOREPLY && icp->un.echo.id == getpid()) {
-			replies++;
+		len = icmp_read_reply(fd, (struct sockaddr *) &from,
+					   sizeof(from), buf, sizeof(buf));
+		if (len > 0) {
+			icp = (struct icmphdr *) &buf[ip->ihl * 4];
+			if (icp->type == ICMP_ECHOREPLY 
+			    && icp->un.echo.id == getpid()) {
+				replies++;
+			}
 		}
+		icmp_send_ping(fd, rp->ai_addr, rp->ai_addrlen, *seq, len);
 	}
 close_fd:
 	icmp_close(fd);
@@ -276,7 +299,7 @@ char *get_provider_gateway(struct provider *p)
 {
 	if (p->gateway != NULL)
 		return p->gateway;
-	return inet_ntoa(p->dest_addr.sin_addr);
+	return p->dest_addr;
 }
 
 void exec_route_change(struct provider_list *head)
