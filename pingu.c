@@ -2,7 +2,6 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -17,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "list.h"
 #include "icmp.h"
 #include "pingu.h"
 #include "xlib.h"
@@ -39,8 +39,9 @@ char *default_up_action = NULL;
 char *default_down_action = NULL;
 char *default_route_script = NULL;
 
-struct provider {
-	char *ping_host;
+struct ping_host {
+	struct list_head host_list_entry;
+	char *host;
 	char *source_ip;
 	char *label;
 	char *interface;
@@ -51,10 +52,7 @@ struct provider {
 	int retry;
 	int required_replies;
 	float timeout;
-	SLIST_ENTRY(provider) provider_list;
 };
-
-SLIST_HEAD(provider_list, provider);
 
 #if 0
 int skip(char **str, int whitespace)
@@ -110,10 +108,10 @@ void parse_line(char *line, char **key, char **value)
 	(*value) = p;
 }
 
-int read_config(const char *file, struct provider_list *head)
+int read_config(const char *file, struct list_head *head)
 {
 	FILE *f = fopen(file, "r");
-	struct provider *p = NULL;
+	struct ping_host *p = NULL;
 	int i = 0, lineno = 0;
 	char line[256];
 	if (f == NULL) {
@@ -128,9 +126,9 @@ int read_config(const char *file, struct provider_list *head)
 			continue;
 
 		if (strcmp(key, "host") == 0) {
-			p = xmalloc(sizeof(struct provider));
-			memset(p, 0, sizeof(struct provider));
-			p->ping_host = xstrdup(value);
+			p = xmalloc(sizeof(struct ping_host));
+			memset(p, 0, sizeof(struct ping_host));
+			p->host = xstrdup(value);
 			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
 			p->retry = default_retry;
@@ -138,7 +136,7 @@ int read_config(const char *file, struct provider_list *head)
 			p->up_action = default_up_action;
 			p->down_action = default_down_action;
 			p->required_replies = default_required_replies;
-			SLIST_INSERT_HEAD(head, p, provider_list);
+			list_add(&p->host_list_entry, head);
 			continue;
 		}
 		if (p == NULL) {
@@ -164,7 +162,7 @@ int read_config(const char *file, struct provider_list *head)
 			if (p->gateway)
 				free(p->gateway);
 			p->gateway = xstrdup(value);
-		} else if ((strcmp(key, "name") == 0) || strcmp(key, "label")) {
+		} else if ((strcmp(key, "name") == 0) || (strcmp(key, "label") == 0)) {
 			p->label = xstrdup(value);
 		} else if (strcmp(key, "up-action") == 0) {
 			p->up_action = xstrdup(value);
@@ -187,7 +185,7 @@ int read_config(const char *file, struct provider_list *head)
 }
 
 /* returns true if it get at least required_replies/retries replies */
-int ping_status(struct provider *p, int *seq)
+int ping_status(struct ping_host *p, int *seq)
 {
 	__u8 buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
@@ -225,7 +223,7 @@ int ping_status(struct provider *p, int *seq)
 	}
 
 	/* get first sockaddr struc that has successful send ping */
-	getaddrinfo(p->ping_host, NULL, NULL, &result);
+	getaddrinfo(p->host, NULL, NULL, &result);
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
 		r = icmp_send_ping(fd, rp->ai_addr, rp->ai_addrlen, *seq, len);
 		if (r >= 0)
@@ -281,7 +279,7 @@ int usage(const char *program)
 }
 
 #if 0
-void dump_provider(struct provider *p)
+void dump_provider(struct ping_host *p)
 {		
 	printf("router:      %s\n"
 	       "provider:    %s\n"
@@ -295,31 +293,32 @@ void dump_provider(struct provider *p)
 }
 #endif
 
-char *get_provider_gateway(struct provider *p)
+char *get_provider_gateway(struct ping_host *p)
 {
 	if (p->gateway != NULL)
 		return p->gateway;
-	return p->ping_host;
+	return p->host;
 }
 
-void exec_route_change(struct provider_list *head)
+void exec_route_change(struct list_head *head)
 {
-	struct provider *p;
+	struct ping_host *p;
+	struct list_head *n;
 	char **args;
 	int i = 0, status;
 	pid_t pid;
 
 	if (default_route_script == NULL)
 		return;
-
-	SLIST_FOREACH(p, head, provider_list) {
+	
+	list_for_each(n, head)
 		i++;
-	}
+
 	args = xmalloc(sizeof(char *) * (i + 2));
 
 	i = 0;
 	args[i++] = default_route_script;
-	SLIST_FOREACH(p, head, provider_list) {
+	list_for_each_entry(p, head, host_list_entry) {
 		if (p->status)
 			args[i++] = get_provider_gateway(p);
 	}
@@ -343,13 +342,13 @@ free_and_return:
 	return;
 }
 
-void ping_loop(struct provider_list *head, int interval)
+void ping_loop(struct list_head *head, int interval)
 {
-	struct provider *p;
+	struct ping_host *p;
 	int seq = 0, change;
 	while (1) {
 		change = 0;
-		SLIST_FOREACH(p, head, provider_list) {
+		list_for_each_entry(p, head, host_list_entry) {
 			int status;
 			status = ping_status(p, &seq);
 			if (status != p->status) {
@@ -430,7 +429,7 @@ static int daemonize(void)
 int main(int argc, char *argv[])
 {
 	int c, debug_mode = 0;
-	struct provider_list providers;
+	struct list_head hostlist = LIST_INITIALIZER(hostlist);
 	char *config_file = DEFAULT_CONFIG;
 
 	while ((c = getopt(argc, argv, "c:dhp:V")) != -1) {
@@ -455,8 +454,7 @@ int main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	SLIST_INIT(&providers);
-	if (read_config(config_file, &providers) == -1)
+	if (read_config(config_file, &hostlist) == -1)
 		return 1;
 
 	if (pingu_daemonize) {
@@ -464,7 +462,7 @@ int main(int argc, char *argv[])
 			return 1;
 	}
 
-	ping_loop(&providers, interval);
+	ping_loop(&hostlist, interval);
 
 	return 0;
 }
