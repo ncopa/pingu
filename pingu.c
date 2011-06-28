@@ -40,7 +40,7 @@ char *default_down_action = NULL;
 char *default_route_script = NULL;
 
 struct provider {
-	char *dest_addr;
+	char *ping_host;
 	char *source_ip;
 	char *label;
 	char *interface;
@@ -130,7 +130,7 @@ int read_config(const char *file, struct provider_list *head)
 		if (strcmp(key, "host") == 0) {
 			p = xmalloc(sizeof(struct provider));
 			memset(p, 0, sizeof(struct provider));
-			p->dest_addr = xstrdup(value);
+			p->ping_host = xstrdup(value);
 			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
 			p->retry = default_retry;
@@ -225,7 +225,7 @@ int ping_status(struct provider *p, int *seq)
 	}
 
 	/* get first sockaddr struc that has successful send ping */
-	getaddrinfo(p->dest_addr, NULL, NULL, &result);
+	getaddrinfo(p->ping_host, NULL, NULL, &result);
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
 		r = icmp_send_ping(fd, rp->ai_addr, rp->ai_addrlen, *seq, len);
 		if (r >= 0)
@@ -299,7 +299,7 @@ char *get_provider_gateway(struct provider *p)
 {
 	if (p->gateway != NULL)
 		return p->gateway;
-	return p->dest_addr;
+	return p->ping_host;
 }
 
 void exec_route_change(struct provider_list *head)
