@@ -41,8 +41,8 @@ char *default_route_script = NULL;
 
 struct provider {
 	char *dest_addr;
-	char *src_addr;
-	char *name;
+	char *source_ip;
+	char *label;
 	char *interface;
 	char *gateway;
 	char *up_action;
@@ -164,8 +164,8 @@ int read_config(const char *file, struct provider_list *head)
 			if (p->gateway)
 				free(p->gateway);
 			p->gateway = xstrdup(value);
-		} else if (strcmp(key, "name") == 0) {
-			p->name = xstrdup(value);
+		} else if ((strcmp(key, "name") == 0) || strcmp(key, "label")) {
+			p->label = xstrdup(value);
 		} else if (strcmp(key, "up-action") == 0) {
 			p->up_action = xstrdup(value);
 		} else if (strcmp(key, "down-action") == 0) {
@@ -177,7 +177,7 @@ int read_config(const char *file, struct provider_list *head)
 		} else if (strcmp(key, "timeout") == 0) {
 			p->timeout = atof(value);
 		} else if (strcmp(key, "source-ip") == 0) {
-			p->src_addr = xstrdup(value);
+			p->source_ip = xstrdup(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  lineno);
@@ -210,8 +210,8 @@ int ping_status(struct provider *p, int *seq)
 			goto close_fd;
 
 	/* set source address */
-	if (p->src_addr != NULL) {
-		r = getaddrinfo(p->src_addr, NULL, NULL, &result);
+	if (p->source_ip != NULL) {
+		r = getaddrinfo(p->source_ip, NULL, NULL, &result);
 		if (r != 0) {
 			log_error("getaddrinfo: %s", gai_strerror(r));
 			goto close_fd;
@@ -290,7 +290,7 @@ void dump_provider(struct provider *p)
 	       "down-action: %s\n"
 	       "p->status:   %i\n"
 	       "\n",
-	       inet_ntoa(p->address.sin_addr), p->name, p->interface,
+	       inet_ntoa(p->address.sin_addr), p->label, p->interface,
 	       p->up_action, p->down_action, p->status);
 }
 #endif
