@@ -59,18 +59,6 @@ struct ping_host {
 	float timeout;
 };
 
-#if 0
-int skip(char **str, int whitespace)
-{
-	char *
-	while (isspace(*p)) {
-		if (*p == '\0')
-			return;
-		p++;
-	}
-}
-#endif
-
 /* note: this overwrite the line buffer */
 void parse_line(char *line, char **key, char **value)
 {
