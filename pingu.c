@@ -19,6 +19,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <ev.h>
+
 #include "icmp.h"
 #include "pingu.h"
 #include "xlib.h"
@@ -57,6 +59,9 @@ struct ping_host {
 	int max_retries;
 	int required_replies;
 	float timeout;
+
+	ev_tstamp burst_interval;
+	struct ev_timer burst_timeout_watcher;
 };
 
 /* note: this overwrite the line buffer */
@@ -105,7 +110,7 @@ int read_config(const char *file, struct list_head *head)
 {
 	FILE *f = fopen(file, "r");
 	struct ping_host *p = NULL;
-	int i = 0, lineno = 0;
+	int lineno = 0;
 	char line[256];
 	if (f == NULL) {
 		log_perror(file);
@@ -129,6 +134,7 @@ int read_config(const char *file, struct list_head *head)
 			p->up_action = default_up_action;
 			p->down_action = default_down_action;
 			p->required_replies = default_required_replies;
+			p->burst_interval = default_burst_interval;
 			list_add(&p->host_list_entry, head);
 			continue;
 		}
@@ -169,6 +175,8 @@ int read_config(const char *file, struct list_head *head)
 			p->timeout = atof(value);
 		} else if (strcmp(key, "source-ip") == 0) {
 			p->source_ip = xstrdup(value);
+		} else if (strcmp(key, "interval") == 0) {
+			p->burst_interval = atof(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  lineno);
@@ -335,32 +343,6 @@ free_and_return:
 	return;
 }
 
-void ping_loop(struct list_head *head, int interval)
-{
-	struct ping_host *p;
-	int seq = 0, change;
-	while (1) {
-		change = 0;
-		list_for_each_entry(p, head, host_list_entry) {
-			int status;
-			status = ping_status(p, &seq);
-			if (status != p->status) {
-				change++;
-				p->status = status;
-				if (status)
-					system(p->up_action);
-				else
-					system(p->down_action);
-			}
-		}
-		if (change)
-			exec_route_change(head);
-
-		sleep(interval);
-
-	}
-}
-
 static void remove_pid_file(void)
 {
 	if (pid_file_fd != 0) {
@@ -419,9 +401,44 @@ static int daemonize(void)
 	return 0;
 }
 
+static void burst_cb(struct ev_loop *loop, struct ev_timer *w,
+			    int revents)
+{
+	struct ping_host *p = container_of(w, struct ping_host, burst_timeout_watcher);
+	int seq = 0, change = 0;
+	int status;
+	status = ping_status(p, &seq);
+//	fprintf(stderr, "DEBUG: status for %s is %i\n", p->host, status);
+	if (status != p->status) {
+		change++;
+		p->status = status;
+		if (status)
+			system(p->up_action);
+		else
+			system(p->down_action);
+	}
+// TODO:
+//	if (change)
+//		exec_route_change(head);
+}
+
+int ping_loop(struct list_head *head)
+{
+	static struct ev_loop *loop;
+	struct ping_host *p;
+	loop = ev_default_loop(0);
+	list_for_each_entry(p, head, host_list_entry) {
+		ev_timer_init(&p->burst_timeout_watcher, burst_cb, 
+			      0, p->burst_interval);
+		ev_timer_start(loop, &p->burst_timeout_watcher);
+	}
+	ev_run(loop, 0);
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
-	int c, debug_mode = 0;
+	int c;
 	struct list_head hostlist = LIST_INITIALIZER(hostlist);
 	char *config_file = DEFAULT_CONFIG;
 
@@ -455,7 +472,5 @@ int main(int argc, char *argv[])
 			return 1;
 	}
 
-	ping_loop(&hostlist, default_burst_interval);
-
-	return 0;
+	return ping_loop(&hostlist);
 }
