@@ -2,10 +2,13 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <sys/file.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -16,10 +19,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "list.h"
 #include "icmp.h"
 #include "pingu.h"
 #include "xlib.h"
+#include "log.h"
+#include "list.h"
+
 
 #ifndef DEFAULT_CONFIG
 #define DEFAULT_CONFIG "/etc/pingu/pingu.conf"
@@ -31,9 +36,9 @@
 
 int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
 char *pid_file = DEFAULT_PIDFILE;
-int interval = 30;
+float default_burst_interval = 30.0;
 float default_timeout = 1.0;
-int default_retry = 5;
+int default_max_retries = 5;
 int default_required_replies = 2;
 char *default_up_action = NULL;
 char *default_down_action = NULL;
@@ -49,7 +54,7 @@ struct ping_host {
 	char *up_action;
 	char *down_action;
 	int status;
-	int retry;
+	int max_retries;
 	int required_replies;
 	float timeout;
 };
@@ -131,7 +136,7 @@ int read_config(const char *file, struct list_head *head)
 			p->host = xstrdup(value);
 			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
-			p->retry = default_retry;
+			p->max_retries = default_max_retries;
 			p->timeout = default_timeout;
 			p->up_action = default_up_action;
 			p->down_action = default_down_action;
@@ -141,9 +146,9 @@ int read_config(const char *file, struct list_head *head)
 		}
 		if (p == NULL) {
 			if (strcmp(key, "interval") == 0) {
-				interval = atoi(value);
+				default_burst_interval = atof(value);
 			} else if (strcmp(key, "retry") == 0) {
-				default_retry = atoi(value);
+				default_max_retries = atoi(value);
 			} else if (strcmp(key, "required") == 0) {
 				default_required_replies = atoi(value);
 			} else if (strcmp(key, "timeout") == 0) {
@@ -169,7 +174,7 @@ int read_config(const char *file, struct list_head *head)
 		} else if (strcmp(key, "down-action") == 0) {
 			p->down_action = xstrdup(value);
 		} else if (strcmp(key, "retry") == 0) {
-			p->retry = atoi(value);
+			p->max_retries = atoi(value);
 		} else if (strcmp(key, "required") == 0) {
 			p->required_replies = atoi(value);
 		} else if (strcmp(key, "timeout") == 0) {
@@ -232,7 +237,7 @@ int ping_status(struct ping_host *p, int *seq)
 	if (rp == NULL)
 		goto close_fd;
 	retry = 0;
-	while (retry < p->retry && replies < p->required_replies) {
+	while (retry < p->max_retries && replies < p->required_replies) {
 		retry++;
 		(*seq)++;
 		(*seq) &= 0xffff;
@@ -462,7 +467,7 @@ int main(int argc, char *argv[])
 			return 1;
 	}
 
-	ping_loop(&hostlist, interval);
+	ping_loop(&hostlist, default_burst_interval);
 
 	return 0;
 }
