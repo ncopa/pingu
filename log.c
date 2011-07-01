@@ -20,8 +20,11 @@
 #include "pingu.h"
 #include "log.h"
 
-void log_init(void)
+static int log_verbose = 0;
+
+void log_init(int verbose)
 {
+	log_verbose = verbose;
 	openlog("pingu", LOG_PERROR | LOG_PID, LOG_DAEMON);
 }
 
@@ -29,7 +32,7 @@ void log_debug(const char *format, ...)
 {
 	va_list va;
 
-	if (pingu_verbose) {
+	if (log_verbose) {
 		va_start(va, format);
 		vsyslog(LOG_DEBUG, format, va);
 		va_end(va);

@@ -27,6 +27,7 @@
 #include "log.h"
 #include "list.h"
 
+#include "pingu_host.h"
 
 #ifndef DEFAULT_CONFIG
 #define DEFAULT_CONFIG "/etc/pingu/pingu.conf"
@@ -45,24 +46,6 @@ int default_required_replies = 2;
 char *default_up_action = NULL;
 char *default_down_action = NULL;
 char *default_route_script = NULL;
-
-struct ping_host {
-	struct list_head host_list_entry;
-	char *host;
-	char *source_ip;
-	char *label;
-	char *interface;
-	char *gateway;
-	char *up_action;
-	char *down_action;
-	int status;
-	int max_retries;
-	int required_replies;
-	float timeout;
-
-	ev_tstamp burst_interval;
-	struct ev_timer burst_timeout_watcher;
-};
 
 /* note: this overwrite the line buffer */
 void parse_line(char *line, char **key, char **value)
@@ -109,7 +92,7 @@ void parse_line(char *line, char **key, char **value)
 int read_config(const char *file, struct list_head *head)
 {
 	FILE *f = fopen(file, "r");
-	struct ping_host *p = NULL;
+	struct pingu_host *p = NULL;
 	int lineno = 0;
 	char line[256];
 	if (f == NULL) {
@@ -124,8 +107,8 @@ int read_config(const char *file, struct list_head *head)
 			continue;
 
 		if (strcmp(key, "host") == 0) {
-			p = xmalloc(sizeof(struct ping_host));
-			memset(p, 0, sizeof(struct ping_host));
+			p = xmalloc(sizeof(struct pingu_host));
+			memset(p, 0, sizeof(struct pingu_host));
 			p->host = xstrdup(value);
 			p->gateway = xstrdup(value);
 			p->status = 1; /* online by default */
@@ -186,7 +169,7 @@ int read_config(const char *file, struct list_head *head)
 }
 
 /* returns true if it get at least required_replies/retries replies */
-int ping_status(struct ping_host *p, int *seq)
+int ping_status(struct pingu_host *p, int *seq)
 {
 	__u8 buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
@@ -280,7 +263,7 @@ int usage(const char *program)
 }
 
 #if 0
-void dump_provider(struct ping_host *p)
+void dump_provider(struct pingu_host *p)
 {		
 	printf("router:      %s\n"
 	       "provider:    %s\n"
@@ -294,7 +277,7 @@ void dump_provider(struct ping_host *p)
 }
 #endif
 
-char *get_provider_gateway(struct ping_host *p)
+char *get_provider_gateway(struct pingu_host *p)
 {
 	if (p->gateway != NULL)
 		return p->gateway;
@@ -303,7 +286,7 @@ char *get_provider_gateway(struct ping_host *p)
 
 void exec_route_change(struct list_head *head)
 {
-	struct ping_host *p;
+	struct pingu_host *p;
 	struct list_head *n;
 	char **args;
 	int i = 0, status;
@@ -404,7 +387,7 @@ static int daemonize(void)
 static void burst_cb(struct ev_loop *loop, struct ev_timer *w,
 			    int revents)
 {
-	struct ping_host *p = container_of(w, struct ping_host, burst_timeout_watcher);
+	struct pingu_host *p = container_of(w, struct pingu_host, burst_timeout_watcher);
 	int seq = 0, change = 0;
 	int status;
 	status = ping_status(p, &seq);
@@ -425,7 +408,7 @@ static void burst_cb(struct ev_loop *loop, struct ev_timer *w,
 int ping_loop(struct list_head *head)
 {
 	static struct ev_loop *loop;
-	struct ping_host *p;
+	struct pingu_host *p;
 	loop = ev_default_loop(0);
 	list_for_each_entry(p, head, host_list_entry) {
 		ev_timer_init(&p->burst_timeout_watcher, burst_cb, 
@@ -464,6 +447,7 @@ int main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	log_init(0);
 	if (read_config(config_file, &hostlist) == -1)
 		return 1;
 
