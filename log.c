@@ -61,3 +61,12 @@ void log_info(const char *format, ...)
 	vsyslog(LOG_INFO, format, va);
 	va_end(va);
 }
+
+void log_warning(const char *format, ...)
+{
+	va_list va;
+
+	va_start(va, format);
+	vsyslog(LOG_WARNING, format, va);
+	va_end(va);
+}
