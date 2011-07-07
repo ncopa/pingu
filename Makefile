@@ -17,7 +17,11 @@ pingu_OBJS = \
 	icmp.o \
 	log.o \
 	pingu.o \
-	xlib.o
+	xlib.o \
+	pingu_burst.o \
+	pingu_iface.o \
+	pingu_ping.o \
+	pingu_host.o
 
 pingu_LIBS = -lev
 

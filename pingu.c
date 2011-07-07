@@ -424,8 +424,10 @@ int main(int argc, char *argv[])
 	int c;
 	struct list_head hostlist = LIST_INITIALIZER(hostlist);
 	char *config_file = DEFAULT_CONFIG;
+	int verbose = 0;
+	static struct ev_loop *loop;
 
-	while ((c = getopt(argc, argv, "c:dhp:V")) != -1) {
+	while ((c = getopt(argc, argv, "c:dhp:Vv")) != -1) {
 		switch (c) {
 		case 'c':
 			config_file = optarg;
@@ -441,20 +443,28 @@ int main(int argc, char *argv[])
 		case 'V':
 			print_version(basename(argv[0]));
 			return 0;
+		case 'v':
+			verbose++;
+			break;
 		}
 	}
 
 	argc -= optind;
 	argv += optind;
 
-	log_init(0);
+	log_init(verbose);
 	if (read_config(config_file, &hostlist) == -1)
 		return 1;
+
+	loop = ev_default_loop(0);
+	pingu_iface_init(loop, &hostlist);
+	pingu_host_init(loop, &hostlist);
 
 	if (pingu_daemonize) {
 		if (daemonize() == -1)
 			return 1;
 	}
 
-	return ping_loop(&hostlist);
+	ev_run(loop, 0);
+	return 0;
 }
