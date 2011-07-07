@@ -8,12 +8,13 @@
 void pingu_host_set_status(struct pingu_host *host, int status)
 {
 	const char *action;
+	host->burst.active = 0;
 	if (host->status == status) {
-		log_debug("%s: status is still %s", host->host, status);
+		log_debug("%s: status is still %i", host->host, status);
 		return;
 	}
 	host->status = status;
-	log_info("%s: new status: %s", host->host, status);
+	log_info("%s: new status: %i", host->host, status);
 	switch (host->status) {
 	case 0:
 		action = host->down_action;

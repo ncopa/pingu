@@ -32,7 +32,7 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 	for (rp = ai; rp != NULL; rp = rp->ai_next) {
 		host->burst.saddr = *ai->ai_addr;
 		r = pingu_ping_send(loop, host);
-		if (r >= 0)
+		if (r == 0)
 			break;
 	}
 
@@ -47,7 +47,7 @@ void pingu_burst_timeout_cb(struct ev_loop *loop, struct ev_timer *w,
 	struct pingu_host *host = container_of(w, struct pingu_host, burst_timeout_watcher);
 
 	if (host->burst.active) {
-		log_warning("%s: burst already active");
+		log_warning("%s: burst already active", host->host);
 		return;
 	}
 	log_debug("%s: new burst", host->host);
