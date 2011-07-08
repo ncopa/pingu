@@ -1,9 +1,32 @@
+
+#include <stdlib.h>
+#include <unistd.h>
 #include <ev.h>
 
 #include "log.h"
 #include "pingu_burst.h"
 #include "pingu_host.h"
 #include "pingu_ping.h"
+
+static void execute_action(const char *action)
+{
+	pid_t pid;
+	const char *shell = getenv("SHELL");
+	if (shell == NULL)
+		shell = "/bin/sh";
+
+	log_debug("executing '%s'", action);
+	pid = fork();
+	if (pid < 0) {
+		log_perror("fork");
+		return;
+	}
+	if (pid == 0) {
+		execl(shell, shell, "-c", action, NULL);
+		log_perror(action);
+		exit(1);
+	}
+}
 
 void pingu_host_set_status(struct pingu_host *host, int status)
 {
@@ -23,7 +46,8 @@ void pingu_host_set_status(struct pingu_host *host, int status)
 		action = host->up_action;
 		break;
 	}
-	log_debug("TODO: execute %s", action);
+	if (action != NULL)
+		execute_action(action);
 }
 
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
