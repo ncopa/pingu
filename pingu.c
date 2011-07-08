@@ -168,78 +168,6 @@ int read_config(const char *file, struct list_head *head)
 	return 0;
 }
 
-/* returns true if it get at least required_replies/retries replies */
-int ping_status(struct pingu_host *p, int *seq)
-{
-	__u8 buf[1500];
-	struct iphdr *ip = (struct iphdr *) buf;
-	struct icmphdr *icp;
-	struct sockaddr_in from;
-	struct addrinfo hints;
-	struct addrinfo *result, *rp;
-
-	int retry, r;
-	int replies = 0;
-	int len = sizeof(struct iphdr) + sizeof(struct icmphdr);
-	int fd = icmp_open(p->timeout);
-
-	memset(&hints, 0, sizeof(hints));
-
-	/* bind to interface if set */
-	if (p->interface != NULL)
-		if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, p->interface, 
-		    	       strlen(p->interface)+1) == -1)
-			goto close_fd;
-
-	/* set source address */
-	if (p->source_ip != NULL) {
-		r = getaddrinfo(p->source_ip, NULL, NULL, &result);
-		if (r != 0) {
-			log_error("getaddrinfo: %s", gai_strerror(r));
-			goto close_fd;
-		}
-
-		for (rp = result; rp != NULL; rp = rp->ai_next) {
-			r = bind(fd, rp->ai_addr, rp->ai_addrlen);
-			if (r == 0)
-				break;
-		}
-	}
-
-	/* get first sockaddr struc that has successful send ping */
-	getaddrinfo(p->host, NULL, NULL, &result);
-	for (rp = result; rp != NULL; rp = rp->ai_next) {
-		r = icmp_send_ping(fd, rp->ai_addr, rp->ai_addrlen, *seq, len);
-		if (r >= 0)
-			break;
-	}
-	if (rp == NULL)
-		goto close_fd;
-	retry = 0;
-	while (retry < p->max_retries && replies < p->required_replies) {
-		retry++;
-		(*seq)++;
-		(*seq) &= 0xffff;
-		len = icmp_read_reply(fd, (struct sockaddr *) &from,
-					   sizeof(from), buf, sizeof(buf));
-		if (len > 0) {
-			icp = (struct icmphdr *) &buf[ip->ihl * 4];
-			if (icp->type == ICMP_ECHOREPLY 
-			    && icp->un.echo.id == getpid()) {
-				replies++;
-			}
-		}
-		icmp_send_ping(fd, rp->ai_addr, rp->ai_addrlen, *seq, len);
-	}
-close_fd:
-	icmp_close(fd);
-#if 0
-	printf("address=%s, replies=%i, required=%i\n",  
-	       inet_ntoa(to->sin_addr), replies, required_replies);
-#endif
-	return (replies >= p->required_replies);
-}
-
 static void print_version(const char *program)
 {
 	printf("%s " PINGU_VERSION "\n", program);
@@ -261,21 +189,6 @@ int usage(const char *program)
 		program);
 	return 1;
 }
-
-#if 0
-void dump_provider(struct pingu_host *p)
-{		
-	printf("router:      %s\n"
-	       "provider:    %s\n"
-	       "interface:   %s\n"
-	       "up-action:   %s\n"
-	       "down-action: %s\n"
-	       "p->status:   %i\n"
-	       "\n",
-	       inet_ntoa(p->address.sin_addr), p->label, p->interface,
-	       p->up_action, p->down_action, p->status);
-}
-#endif
 
 char *get_provider_gateway(struct pingu_host *p)
 {
@@ -381,41 +294,6 @@ static int daemonize(void)
 
 	umask(0);
 
-	return 0;
-}
-
-static void burst_cb(struct ev_loop *loop, struct ev_timer *w,
-			    int revents)
-{
-	struct pingu_host *p = container_of(w, struct pingu_host, burst_timeout_watcher);
-	int seq = 0, change = 0;
-	int status;
-	status = ping_status(p, &seq);
-//	fprintf(stderr, "DEBUG: status for %s is %i\n", p->host, status);
-	if (status != p->status) {
-		change++;
-		p->status = status;
-		if (status)
-			system(p->up_action);
-		else
-			system(p->down_action);
-	}
-// TODO:
-//	if (change)
-//		exec_route_change(head);
-}
-
-int ping_loop(struct list_head *head)
-{
-	static struct ev_loop *loop;
-	struct pingu_host *p;
-	loop = ev_default_loop(0);
-	list_for_each_entry(p, head, host_list_entry) {
-		ev_timer_init(&p->burst_timeout_watcher, burst_cb, 
-			      0, p->burst_interval);
-		ev_timer_start(loop, &p->burst_timeout_watcher);
-	}
-	ev_run(loop, 0);
 	return 0;
 }
 
