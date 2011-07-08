@@ -1,19 +1,10 @@
 
-#include <arpa/inet.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
 #include <sys/file.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 
-#include <ctype.h>
-#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libgen.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,134 +30,6 @@
 
 int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
 char *pid_file = DEFAULT_PIDFILE;
-float default_burst_interval = 30.0;
-float default_timeout = 1.0;
-int default_max_retries = 5;
-int default_required_replies = 2;
-char *default_up_action = NULL;
-char *default_down_action = NULL;
-char *default_route_script = NULL;
-
-/* note: this overwrite the line buffer */
-void parse_line(char *line, char **key, char **value)
-{
-	char *p;
-
-	/* strip comments and trailng \n */
-	p = strpbrk(line, "#\n");
-	if (p)
-		*p = '\0';
-
-	(*value) = NULL;
-	if (line[0] == '\0') {
-		(*key) = NULL;
-		return;
-	}
-	
-	/* skip leading whitespace */
-	while (isspace(*p)) {
-		if (*p == '\0')
-			return;
-		p++;
-	}
-	(*key) = line;
-
-	/* find space between keyword and value */
-	p = line;
-	while (!isspace(*p)) {
-		if (*p == '\0')
-			return;
-		p++;
-	}
-	*p++ = '\0';
-
-	/* find value */
-	while (isspace(*p)) {
-		if (*p == '\0')
-			return;
-		p++;
-	}
-	(*value) = p;
-}
-
-int read_config(const char *file, struct list_head *head)
-{
-	FILE *f = fopen(file, "r");
-	struct pingu_host *p = NULL;
-	int lineno = 0;
-	char line[256];
-	if (f == NULL) {
-		log_perror(file);
-		return -1;
-	}
-	while (fgets(line, sizeof(line), f)) {
-		char *key, *value;
-		lineno++;
-		parse_line(line, &key, &value);
-		if (key == NULL)
-			continue;
-
-		if (strcmp(key, "host") == 0) {
-			p = xmalloc(sizeof(struct pingu_host));
-			memset(p, 0, sizeof(struct pingu_host));
-			p->host = xstrdup(value);
-			p->gateway = xstrdup(value);
-			p->status = 1; /* online by default */
-			p->max_retries = default_max_retries;
-			p->timeout = default_timeout;
-			p->up_action = default_up_action;
-			p->down_action = default_down_action;
-			p->required_replies = default_required_replies;
-			p->burst_interval = default_burst_interval;
-			list_add(&p->host_list_entry, head);
-			continue;
-		}
-		if (p == NULL) {
-			if (strcmp(key, "interval") == 0) {
-				default_burst_interval = atof(value);
-			} else if (strcmp(key, "retry") == 0) {
-				default_max_retries = atoi(value);
-			} else if (strcmp(key, "required") == 0) {
-				default_required_replies = atoi(value);
-			} else if (strcmp(key, "timeout") == 0) {
-				default_timeout = atof(value);
-			} else if (strcmp(key, "up-action") == 0) {
-				default_up_action = xstrdup(value);
-			} else if (strcmp(key, "down-action") == 0) {
-				default_down_action = xstrdup(value);
-			} else if (strcmp(key, "route-script") == 0) {
-				default_route_script = xstrdup(value);
-			} else 
-				log_error("host not specified");
-		} else if (strcmp(key, "interface") == 0) {
-			p->interface = xstrdup(value);
-		} else if (strcmp(key, "gateway") == 0) {
-			if (p->gateway)
-				free(p->gateway);
-			p->gateway = xstrdup(value);
-		} else if ((strcmp(key, "name") == 0) || (strcmp(key, "label") == 0)) {
-			p->label = xstrdup(value);
-		} else if (strcmp(key, "up-action") == 0) {
-			p->up_action = xstrdup(value);
-		} else if (strcmp(key, "down-action") == 0) {
-			p->down_action = xstrdup(value);
-		} else if (strcmp(key, "retry") == 0) {
-			p->max_retries = atoi(value);
-		} else if (strcmp(key, "required") == 0) {
-			p->required_replies = atoi(value);
-		} else if (strcmp(key, "timeout") == 0) {
-			p->timeout = atof(value);
-		} else if (strcmp(key, "source-ip") == 0) {
-			p->source_ip = xstrdup(value);
-		} else if (strcmp(key, "interval") == 0) {
-			p->burst_interval = atof(value);
-		} else {
-			log_error("Unknown keyword '%s' on line %i", key,
-				  lineno);
-		}
-	}
-	return 0;
-}
 
 static void print_version(const char *program)
 {
@@ -197,6 +60,7 @@ char *get_provider_gateway(struct pingu_host *p)
 	return p->host;
 }
 
+#if 0
 void exec_route_change(struct list_head *head)
 {
 	struct pingu_host *p;
@@ -238,6 +102,7 @@ free_and_return:
 	free(args);
 	return;
 }
+#endif
 
 static void remove_pid_file(void)
 {
@@ -300,8 +165,7 @@ static int daemonize(void)
 int main(int argc, char *argv[])
 {
 	int c;
-	struct list_head hostlist = LIST_INITIALIZER(hostlist);
-	char *config_file = DEFAULT_CONFIG;
+	const char *config_file = DEFAULT_CONFIG;
 	int verbose = 0;
 	static struct ev_loop *loop;
 
@@ -331,12 +195,8 @@ int main(int argc, char *argv[])
 	argv += optind;
 
 	log_init(verbose);
-	if (read_config(config_file, &hostlist) == -1)
-		return 1;
-
 	loop = ev_default_loop(0);
-	pingu_iface_init(loop, &hostlist);
-	pingu_host_init(loop, &hostlist);
+	pingu_host_init(loop, config_file);
 
 	if (pingu_daemonize) {
 		if (daemonize() == -1)

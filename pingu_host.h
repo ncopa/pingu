@@ -26,7 +26,7 @@ struct pingu_host {
 };
 
 void pingu_host_set_status(struct pingu_host *host, int status);
-int pingu_host_init(struct ev_loop *loop, struct list_head *host_list);
+int pingu_host_init(struct ev_loop *loop, const char *config_file);
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host);
 
 #endif
