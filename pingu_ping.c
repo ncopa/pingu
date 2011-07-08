@@ -106,8 +106,10 @@ int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host)
 	seq = pingu_ping_get_seq();
 	r = icmp_send_ping(host->iface->fd, &host->burst.saddr,
 			       sizeof(host->burst.saddr), seq, packetlen);
-	if (r < 0)
+	if (r < 0) {
+		pingu_host_set_status(host, 0);
 		return -1;
+	}
 
 	ping = pingu_ping_add(loop, host, seq);
 	return ping == NULL ? -1 : 0;
