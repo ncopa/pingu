@@ -89,8 +89,10 @@ static struct pingu_ping *pingu_ping_find(struct icmphdr *icp,
 static void pingu_ping_handle_reply(struct ev_loop *loop,
 				    struct pingu_ping *ping)
 {
-	log_debug("%s: got seq %i", ping->host->host, ping->seq);
 	ping->host->burst.pings_replied++;
+	log_debug("%s: got seq %i (%i/%i)", ping->host->host, ping->seq,
+		  ping->host->burst.pings_replied,
+		  ping->host->required_replies);
 	list_del(&ping->ping_list_entry);
 	ev_timer_stop(loop, &ping->timeout_watcher);
 	pingu_host_verify_status(loop, ping->host);
