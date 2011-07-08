@@ -53,57 +53,6 @@ int usage(const char *program)
 	return 1;
 }
 
-char *get_provider_gateway(struct pingu_host *p)
-{
-	if (p->gateway != NULL)
-		return p->gateway;
-	return p->host;
-}
-
-#if 0
-void exec_route_change(struct list_head *head)
-{
-	struct pingu_host *p;
-	struct list_head *n;
-	char **args;
-	int i = 0, status;
-	pid_t pid;
-
-	if (default_route_script == NULL)
-		return;
-	
-	list_for_each(n, head)
-		i++;
-
-	args = xmalloc(sizeof(char *) * (i + 2));
-
-	i = 0;
-	args[i++] = default_route_script;
-	list_for_each_entry(p, head, host_list_entry) {
-		if (p->status)
-			args[i++] = get_provider_gateway(p);
-	}
-	args[i] = NULL;
-	pid = fork();
-	switch (pid) {
-	case -1:
-		log_perror("fork");
-		goto free_and_return;
-		break;
-	case 0:
-		execvp(default_route_script, args);
-		log_perror(args[0]);
-		exit(1);
-	default:
-		wait(&status);
-	}
-
-free_and_return:
-	free(args);
-	return;
-}
-#endif
-
 static void remove_pid_file(void)
 {
 	if (pid_file_fd != 0) {

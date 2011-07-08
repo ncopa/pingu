@@ -144,6 +144,55 @@ int pingu_host_read_config(const char *file)
 	return 0;
 }
 
+static char *get_provider_gateway(struct pingu_host *p)
+{
+	if (p->gateway != NULL)
+		return p->gateway;
+	return p->host;
+}
+
+static void exec_route_change(void)
+{
+	struct pingu_host *host;
+	struct list_head *n;
+	char **args;
+	int i = 0;
+	pid_t pid;
+
+	if (default_route_script == NULL)
+		return;
+	
+	list_for_each(n, &host_list)
+		i++;
+
+	args = malloc(sizeof(char *) * (i + 2));
+	if (args == NULL) {
+		log_perror("malloc");
+		return;
+	}
+
+	i = 0;
+	args[i++] = default_route_script;
+	list_for_each_entry(host, &host_list, host_list_entry) {
+		if (host->status)
+			args[i++] = get_provider_gateway(host);
+	}
+	args[i] = NULL;
+	pid = fork();
+	if (pid < 0) {
+		log_perror("fork");
+		free(args);
+		return;
+	}
+	if (pid == 0) {
+		/* the child */
+		execvp(default_route_script, args);
+		log_perror(args[0]);
+		exit(1);
+	}
+	/* libev reaps all children */
+}
+
 static void execute_action(const char *action)
 {
 	pid_t pid;
@@ -184,6 +233,7 @@ void pingu_host_set_status(struct pingu_host *host, int status)
 	}
 	if (action != NULL)
 		execute_action(action);
+	exec_route_change();
 }
 
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
