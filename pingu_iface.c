@@ -78,7 +78,7 @@ struct pingu_iface *pingu_iface_find_or_create(struct ev_loop *loop, const char 
 	}
 
 	if (name != NULL)
-		strlcpy(iface->name, name, sizeof(*iface->name));
+		strlcpy(iface->name, name, sizeof(iface->name));
 	
 	if (pingu_iface_init_socket(loop, iface) == -1) {
 		free(iface);
