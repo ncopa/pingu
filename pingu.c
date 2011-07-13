@@ -19,6 +19,7 @@
 #include "list.h"
 
 #include "pingu_host.h"
+#include "pingu_netlink.h"
 
 #ifndef DEFAULT_CONFIG
 #define DEFAULT_CONFIG "/etc/pingu/pingu.conf"
@@ -146,6 +147,7 @@ int main(int argc, char *argv[])
 	log_init(verbose);
 	loop = ev_default_loop(0);
 	pingu_host_init(loop, config_file);
+	kernel_init(loop);
 
 	if (pingu_daemonize) {
 		if (daemonize() == -1)

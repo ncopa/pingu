@@ -6,7 +6,9 @@
 
 struct pingu_iface {
 	char name[32];
+	int index;
 	int has_binding;
+	int has_link;
 	int fd;
 	struct list_head iface_list_entry;
 //	struct list_head burst_list;

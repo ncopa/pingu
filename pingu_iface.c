@@ -52,7 +52,6 @@ static int pingu_iface_init_socket(struct ev_loop *loop,
 
 	ev_io_init(&iface->socket_watcher, pingu_iface_socket_cb, iface->fd, EV_READ);
 	ev_io_start(loop, &iface->socket_watcher);
-	pingu_iface_bind_socket(iface, 1);
 	return 0;
 }
 
@@ -60,7 +59,7 @@ int pingu_iface_usable(struct pingu_iface *iface)
 {
 	if (iface->name[0] == '\0')
 		return 1;
-	return iface->has_binding;
+	return iface->has_link && iface->has_binding;
 }
 
 struct pingu_iface *pingu_iface_find(const char *name)

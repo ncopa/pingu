@@ -260,8 +260,6 @@ int pingu_host_init(struct ev_loop *loop, const char *config)
 		return -1;
 	
 	list_for_each_entry(host, &host_list, host_list_entry) {
-		if (!pingu_iface_usable(host->iface))
-			pingu_host_set_status(host, 0);
 		ev_timer_init(&host->burst_timeout_watcher,
 			      pingu_burst_timeout_cb, 0, host->burst_interval);
 		ev_timer_start(loop, &host->burst_timeout_watcher);
