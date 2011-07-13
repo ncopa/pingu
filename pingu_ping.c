@@ -106,7 +106,7 @@ int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
 	struct pingu_ping *ping;
 	int seq, r;
 
-	if ((host->iface->name[0] != '\0') && !host->iface->has_binding)
+	if (!pingu_iface_usable(host->iface))
 		return pingu_host_set_status(host, 0) - 1;
 
 	seq = pingu_ping_get_seq();

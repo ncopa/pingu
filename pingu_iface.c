@@ -56,6 +56,13 @@ static int pingu_iface_init_socket(struct ev_loop *loop,
 	return 0;
 }
 
+int pingu_iface_usable(struct pingu_iface *iface)
+{
+	if (iface->name[0] == '\0')
+		return 1;
+	return iface->has_binding;
+}
+
 struct pingu_iface *pingu_iface_find(const char *name)
 {
 	struct pingu_iface *iface;

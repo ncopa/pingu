@@ -17,6 +17,7 @@ struct pingu_iface {
 struct pingu_iface *pingu_iface_find(const char *name);
 struct pingu_iface *pingu_iface_find_or_create(struct ev_loop *loop, const char *name);
 int pingu_iface_bind_socket(struct pingu_iface *iface, int log_error);
+int pingu_iface_usable(struct pingu_iface *iface);
 int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list);
 
 #endif
