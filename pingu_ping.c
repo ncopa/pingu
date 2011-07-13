@@ -99,17 +99,22 @@ static void pingu_ping_handle_reply(struct ev_loop *loop,
 	free(ping);
 }
 
-int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host)
+int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
+		    int set_status_on_failure)
 {
 	int packetlen = sizeof(struct iphdr) + sizeof(struct icmphdr);
 	struct pingu_ping *ping;
 	int seq, r;
 
+	if ((host->iface->name[0] != '\0') && !host->iface->has_binding)
+		return pingu_host_set_status(host, 0) - 1;
+
 	seq = pingu_ping_get_seq();
 	r = icmp_send_ping(host->iface->fd, &host->burst.saddr,
 			       sizeof(host->burst.saddr), seq, packetlen);
 	if (r < 0) {
-		pingu_host_set_status(host, 0);
+		if (set_status_on_failure)
+			pingu_host_set_status(host, 0);
 		return -1;
 	}
 

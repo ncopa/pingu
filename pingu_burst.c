@@ -10,12 +10,20 @@
 #include "pingu_burst.h"
 #include "pingu_host.h"
 #include "pingu_ping.h"
+#include "pingu_iface.h"
 
 void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 {
 	struct addrinfo hints;
 	struct addrinfo *ai, *rp;
 	int r;
+
+	/* we bind to device every burst in case an iface disappears and
+	   comes back. e.g ppp0 */
+	if (pingu_iface_bind_socket(host->iface, host->status) < 0) {
+		pingu_host_set_status(host, 0);
+		return;
+	}
 	
 	host->burst.active = 1;
 	host->burst.pings_sent = 0;
@@ -31,7 +39,7 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 
 	for (rp = ai; rp != NULL; rp = rp->ai_next) {
 		host->burst.saddr = *ai->ai_addr;
-		r = pingu_ping_send(loop, host);
+		r = pingu_ping_send(loop, host, 0);
 		if (r == 0)
 			break;
 	}

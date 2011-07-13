@@ -213,16 +213,18 @@ static void execute_action(const char *action)
 	}
 }
 
-void pingu_host_set_status(struct pingu_host *host, int status)
+int pingu_host_set_status(struct pingu_host *host, int status)
 {
 	const char *action;
 	host->burst.active = 0;
 	if (host->status == status) {
-		log_debug("%s: status is still %i", host->host, status);
-		return;
+		log_debug("%s: %s: status is still %i",
+			host->iface->name, host->host, status);
+		return status;
 	}
 	host->status = status;
-	log_info("%s: new status: %i", host->host, status);
+	log_info("%s: %s: new status: %i",
+		host->iface->name, host->host, status);
 	switch (host->status) {
 	case 0:
 		action = host->down_action;
@@ -234,6 +236,7 @@ void pingu_host_set_status(struct pingu_host *host, int status)
 	if (action != NULL)
 		execute_action(action);
 	exec_route_change();
+	return status;
 }
 
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
@@ -243,7 +246,7 @@ int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
 	} else if (host->burst.pings_sent >= host->max_retries) {
 		pingu_host_set_status(host, 0);
 	} else
-		pingu_ping_send(loop, host);
+		pingu_ping_send(loop, host, 1);
 	return 0;
 }
 
@@ -257,6 +260,8 @@ int pingu_host_init(struct ev_loop *loop, const char *config)
 		return -1;
 	
 	list_for_each_entry(host, &host_list, host_list_entry) {
+		if (host->iface->name[0] != '\0' && !host->iface->has_binding)
+			pingu_host_set_status(host, 0);
 		ev_timer_init(&host->burst_timeout_watcher,
 			      pingu_burst_timeout_cb, 0, host->burst_interval);
 		ev_timer_start(loop, &host->burst_timeout_watcher);

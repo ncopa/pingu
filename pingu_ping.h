@@ -13,7 +13,8 @@ struct pingu_ping {
 	struct ev_timer timeout_watcher;
 };
 
-int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host);
+int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
+		    int set_status_on_failure);
 void pingu_ping_read_reply(struct ev_loop *loop, struct pingu_iface *iface);
 
 #endif

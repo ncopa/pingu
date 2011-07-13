@@ -27,11 +27,23 @@ static void pingu_iface_socket_cb(struct ev_loop *loop, struct ev_io *w,
 	if (revents & EV_READ)
 		pingu_ping_read_reply(loop, iface);
 }
-		
+
+int pingu_iface_bind_socket(struct pingu_iface *iface, int log_error)
+{
+	int r;
+	if (iface->name[0] == '\0')
+		return 0;
+	r = setsockopt(iface->fd, SOL_SOCKET, SO_BINDTODEVICE, iface->name,
+		       strlen(iface->name));
+	if (r < 0 && log_error)
+		log_perror(iface->name);
+	iface->has_binding = (r == 0);
+	return r;
+}
+
 static int pingu_iface_init_socket(struct ev_loop *loop,
 				   struct pingu_iface *iface)
 {
-	int r;
 	iface->fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	if (iface->fd < 0) {
 		log_perror("socket");
@@ -40,15 +52,7 @@ static int pingu_iface_init_socket(struct ev_loop *loop,
 
 	ev_io_init(&iface->socket_watcher, pingu_iface_socket_cb, iface->fd, EV_READ);
 	ev_io_start(loop, &iface->socket_watcher);
-
-	if (iface->name[0] == '\0')
-		return 0;
-	r = setsockopt(iface->fd, SOL_SOCKET, SO_BINDTODEVICE, iface->name,
-		       strlen(iface->name));
-	if (r < 0) {
-		log_perror(iface->name);
-		return -1;
-	}
+	pingu_iface_bind_socket(iface, 1);
 	return 0;
 }
 

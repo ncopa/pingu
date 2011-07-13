@@ -6,6 +6,7 @@
 
 struct pingu_iface {
 	char name[32];
+	int has_binding;
 	int fd;
 	struct list_head iface_list_entry;
 //	struct list_head burst_list;
@@ -15,6 +16,7 @@ struct pingu_iface {
 
 struct pingu_iface *pingu_iface_find(const char *name);
 struct pingu_iface *pingu_iface_find_or_create(struct ev_loop *loop, const char *name);
+int pingu_iface_bind_socket(struct pingu_iface *iface, int log_error);
 int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list);
 
 #endif
