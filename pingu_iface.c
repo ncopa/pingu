@@ -62,7 +62,7 @@ int pingu_iface_usable(struct pingu_iface *iface)
 	return iface->has_link && iface->has_binding;
 }
 
-struct pingu_iface *pingu_iface_find(const char *name)
+struct pingu_iface *pingu_iface_get_by_name(const char *name)
 {
 	struct pingu_iface *iface;
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
@@ -75,9 +75,19 @@ struct pingu_iface *pingu_iface_find(const char *name)
 	return NULL;
 }
 
+struct pingu_iface *pingu_iface_get_by_index(int index)
+{
+	struct pingu_iface *iface;
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (iface->index == index)
+			return iface;
+	}
+	return NULL;
+}
+
 struct pingu_iface *pingu_iface_find_or_create(struct ev_loop *loop, const char *name)
 {
-	struct pingu_iface *iface = pingu_iface_find(name);
+	struct pingu_iface *iface = pingu_iface_get_by_name(name);
 	if (iface != NULL)
 		return iface;
 
@@ -97,6 +107,25 @@ struct pingu_iface *pingu_iface_find_or_create(struct ev_loop *loop, const char 
 	list_init(&iface->ping_list);
 	list_add(&iface->iface_list_entry, &iface_list);
 	return iface;
+}
+
+void pingu_iface_set_addr(struct pingu_iface *iface, int family,
+			  void *data, int len)
+{
+	struct sockaddr_in *sin;
+	memset(&iface->primary_addr, 0, sizeof(iface->primary_addr));
+	if (len <= 0) {
+		log_debug("%s: address removed", iface->name);
+		return;
+	}
+	iface->primary_addr.sa_family = family;
+	switch (family) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)&iface->primary_addr;
+		memcpy(&sin->sin_addr, data, len);
+		log_debug("%s: new address: %s", iface->name, inet_ntoa(sin->sin_addr));
+		break;
+	}
 }
 
 int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)

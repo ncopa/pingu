@@ -178,7 +178,7 @@ static void netlink_link_new(struct nlmsghdr *msg)
 		return;
 
 	ifname = RTA_DATA(rta[IFLA_IFNAME]);
-	iface = pingu_iface_find(ifname);
+	iface = pingu_iface_get_by_name(ifname);
 	if (iface == NULL)
 		return;
 
@@ -207,7 +207,7 @@ static void netlink_link_del(struct nlmsghdr *msg)
 		return;
 
 	ifname = RTA_DATA(rta[IFLA_IFNAME]);
-	iface = pingu_iface_find(ifname);
+	iface = pingu_iface_get_by_name(ifname);
 	if (iface == NULL)
 		return;
 
@@ -216,11 +216,54 @@ static void netlink_link_del(struct nlmsghdr *msg)
 	iface->has_link = 0;
 }
 
+static void netlink_addr_new(struct nlmsghdr *msg)
+{
+	struct pingu_iface *iface;
+	struct ifaddrmsg *ifa = NLMSG_DATA(msg);
+	struct rtattr *rta[IFA_MAX+1];
+
+	if (ifa->ifa_flags & IFA_F_SECONDARY)
+		return;
+
+	netlink_parse_rtattr(rta, IFA_MAX, IFA_RTA(ifa), IFA_PAYLOAD(msg));
+	if (rta[IFA_LOCAL] == NULL)
+		return;
+
+	iface = pingu_iface_get_by_index(ifa->ifa_index);
+	if (iface == NULL || rta[IFA_LOCAL] == NULL)
+		return;
+
+	pingu_iface_set_addr(iface, ifa->ifa_family,
+			     RTA_DATA(rta[IFA_LOCAL]), 
+			     RTA_PAYLOAD(rta[IFA_LOCAL]));
+}
+
+static void netlink_addr_del(struct nlmsghdr *nlmsg)
+{
+	struct pingu_iface *iface;
+	struct ifaddrmsg *ifa = NLMSG_DATA(nlmsg);
+	struct rtattr *rta[IFA_MAX+1];
+
+	if (ifa->ifa_flags & IFA_F_SECONDARY)
+		return;
+
+	netlink_parse_rtattr(rta, IFA_MAX, IFA_RTA(ifa), IFA_PAYLOAD(nlmsg));
+	if (rta[IFA_LOCAL] == NULL)
+		return;
+
+	iface = pingu_iface_get_by_index(ifa->ifa_index);
+	if (iface == NULL)
+		return;
+
+	pingu_iface_set_addr(iface, 0, NULL, 0); 
+}
+
+
 static const netlink_dispatch_f route_dispatch[RTM_MAX] = {
 	[RTM_NEWLINK] = netlink_link_new,
 	[RTM_DELLINK] = netlink_link_del,
-/*	[RTM_NEWADDR] = netlink_addr_new,
-	[RTM_DELADDR] = netlink_addr_del,
+	[RTM_NEWADDR] = netlink_addr_new,
+/*	[RTM_DELADDR] = netlink_addr_del,
 	[RTM_NEWROUTE] = netlink_route_new,
 	[RTM_DELROUTE] = netlink_route_del,
 */
@@ -300,12 +343,12 @@ int kernel_init(struct ev_loop *loop)
 	netlink_enumerate(&talk_fd, PF_UNSPEC, RTM_GETLINK);
 	netlink_read_cb(loop, &talk_fd.io, EV_READ);
 
-/*
 	netlink_enumerate(&talk_fd, PF_UNSPEC, RTM_GETADDR);
-	netlink_read_cb(&talk_fd.io, EV_READ);
+	netlink_read_cb(loop, &talk_fd.io, EV_READ);
 
+/*
 	netlink_enumerate(&talk_fd, PF_UNSPEC, RTM_GETROUTE);
-	netlink_read_cb(&talk_fd.io, EV_READ);
+	netlink_read_cb(loop, &talk_fd.io, EV_READ);
 */
 	return TRUE;
 
