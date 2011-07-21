@@ -18,6 +18,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/ip.h>
 #include <linux/if.h>
+#include <netinet/in.h>
 
 #include <time.h>
 #include <stdio.h>
@@ -27,6 +28,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <ev.h>
 
@@ -82,6 +84,23 @@ static void netlink_parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rt
 			tb[rta->rta_type] = rta;
 		rta = RTA_NEXT(rta,len);
 	}
+}
+
+static int netlink_add_rtattr_l(struct nlmsghdr *n, int maxlen, int type,
+				const void *data, int alen)
+{
+	int len = RTA_LENGTH(alen);
+	struct rtattr *rta;
+
+	if (NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len) > maxlen)
+		return FALSE;
+
+	rta = NLMSG_TAIL(n);
+	rta->rta_type = type;
+	rta->rta_len = len;
+	memcpy(RTA_DATA(rta), data, alen);
+	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len);
+	return TRUE;
 }
 
 static int netlink_receive(struct netlink_fd *fd, struct nlmsghdr *reply)
@@ -164,6 +183,40 @@ static int netlink_enumerate(struct netlink_fd *fd, int family, int type)
 
 	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
 		      (struct sockaddr *) &addr, sizeof(addr)) >= 0;
+}
+
+int netlink_route_add_or_replace(struct netlink_fd *fd, 
+	in_addr_t destination, uint32_t masklen, in_addr_t gateway, int iface_index, int table)
+{
+	struct {
+		struct nlmsghdr	nlh;
+		struct rtmsg	msg;
+		char buf[1024];
+	} req;
+	struct sockaddr_nl addr;
+
+	memset(&req, 0, sizeof(req));
+	memset(&addr, 0, sizeof(addr));
+	addr.nl_family = AF_NETLINK;
+
+	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+	req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE;
+	req.nlh.nlmsg_type = RTM_NEWROUTE;
+	
+	req.msg.rtm_family = AF_INET;
+	req.msg.rtm_table = table;
+	req.msg.rtm_dst_len = masklen;
+	req.msg.rtm_protocol = RTPROT_BOOT;
+	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
+	req.msg.rtm_type = RTN_UNICAST;
+	
+	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_DST, &destination, 4);
+	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_OIF, &iface_index, 4);
+	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_GATEWAY, &gateway, 4);
+
+	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
+		      (struct sockaddr *) &addr, sizeof(addr));
+
 }
 
 static void netlink_link_new(struct nlmsghdr *msg)
@@ -259,14 +312,47 @@ static void netlink_addr_del(struct nlmsghdr *nlmsg)
 }
 
 
+static void netlink_route_new(struct nlmsghdr *msg)
+{
+	struct pingu_iface *iface;
+	struct rtmsg *rtm = NLMSG_DATA(msg);
+	struct rtattr *rta[RTA_MAX+1];
+
+	in_addr_t destination = 0;
+	in_addr_t gateway = 0;
+	char deststr[64], gwstr[64];
+	
+	netlink_parse_rtattr(rta, RTA_MAX, RTM_RTA(rtm), RTM_PAYLOAD(msg));
+	if (rta[RTA_OIF] == NULL || rta[RTA_GATEWAY] == NULL
+	    || rtm->rtm_family != PF_INET || rtm->rtm_table != RT_TABLE_MAIN)
+		return;
+
+	if (rta[RTA_DST] != NULL)
+		destination = *(in_addr_t *)RTA_DATA(rta[RTA_DST]);
+
+	iface = pingu_iface_get_by_index(*(int*)RTA_DATA(rta[RTA_OIF]));
+	if (iface == NULL)
+		return;
+
+	gateway = *(in_addr_t *)RTA_DATA(rta[RTA_GATEWAY]);
+
+	inet_ntop(rtm->rtm_family, &destination, deststr, sizeof(deststr));
+	inet_ntop(rtm->rtm_family, &gateway, gwstr, sizeof(gwstr));
+
+	log_debug("New route to %s via %s dev %s table %i", deststr, gwstr,
+		iface->name, iface->route_table);
+
+	netlink_route_add_or_replace(&talk_fd, destination, rtm->rtm_dst_len,
+		gateway, iface->index, iface->route_table);
+}
+
 static const netlink_dispatch_f route_dispatch[RTM_MAX] = {
 	[RTM_NEWLINK] = netlink_link_new,
 	[RTM_DELLINK] = netlink_link_del,
 	[RTM_NEWADDR] = netlink_addr_new,
-/*	[RTM_DELADDR] = netlink_addr_del,
+	[RTM_DELADDR] = netlink_addr_del,
 	[RTM_NEWROUTE] = netlink_route_new,
-	[RTM_DELROUTE] = netlink_route_del,
-*/
+//	[RTM_DELROUTE] = netlink_route_del,
 };
 
 static void netlink_read_cb(struct ev_loop *loop, struct ev_io *w, int revents)
@@ -328,6 +414,7 @@ error:
 	return FALSE;
 }
 
+
 int kernel_init(struct ev_loop *loop)
 {
 	int i;
@@ -346,10 +433,9 @@ int kernel_init(struct ev_loop *loop)
 	netlink_enumerate(&talk_fd, PF_UNSPEC, RTM_GETADDR);
 	netlink_read_cb(loop, &talk_fd.io, EV_READ);
 
-/*
 	netlink_enumerate(&talk_fd, PF_UNSPEC, RTM_GETROUTE);
 	netlink_read_cb(loop, &talk_fd.io, EV_READ);
-*/
+
 	return TRUE;
 
 err_close_all:

@@ -15,6 +15,7 @@ struct pingu_host {
 	char *up_action;
 	char *down_action;
 	int status;
+	int iface_route_table;
 	int max_retries;
 	int required_replies;
 	ev_tstamp timeout;

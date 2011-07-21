@@ -22,6 +22,7 @@ int default_required_replies = 2;
 char *default_up_action = NULL;
 char *default_down_action = NULL;
 char *default_route_script = NULL;
+int default_route_table = 10;
 
 /* note: this overwrite the line buffer */
 static void parse_line(char *line, char **key, char **value)
@@ -112,6 +113,8 @@ int pingu_host_read_config(const char *file)
 				default_down_action = xstrdup(value);
 			} else if (strcmp(key, "route-script") == 0) {
 				default_route_script = xstrdup(value);
+			} else if (strcmp(key, "route-table") == 0) {
+				default_route_table = atoi(value);
 			} else 
 				log_error("host not specified");
 		} else if (strcmp(key, "interface") == 0) {
@@ -136,6 +139,8 @@ int pingu_host_read_config(const char *file)
 			p->source_ip = xstrdup(value);
 		} else if (strcmp(key, "interval") == 0) {
 			p->burst_interval = atof(value);
+		} else if (strcmp(key, "route-table") == 0) {
+			p->iface_route_table = atoi(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  lineno);

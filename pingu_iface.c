@@ -85,7 +85,7 @@ struct pingu_iface *pingu_iface_get_by_index(int index)
 	return NULL;
 }
 
-struct pingu_iface *pingu_iface_find_or_create(struct ev_loop *loop, const char *name)
+struct pingu_iface *pingu_iface_new(struct ev_loop *loop, const char *name)
 {
 	struct pingu_iface *iface = pingu_iface_get_by_name(name);
 	if (iface != NULL)
@@ -132,8 +132,13 @@ int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)
 {
 	struct pingu_host *host;
 	struct pingu_iface *iface;
+	int autotbl = 10;
 	list_for_each_entry(host, host_list, host_list_entry) {
-		iface = pingu_iface_find_or_create(loop, host->interface);
+		iface = pingu_iface_get_by_name(host->interface);
+		if (iface == NULL) {
+			iface = pingu_iface_new(loop, host->interface);
+			iface->route_table = autotbl++;
+		}
 		if (iface == NULL)
 			return -1;
 		host->iface = iface;
