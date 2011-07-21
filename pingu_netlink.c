@@ -18,6 +18,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/ip.h>
 #include <linux/if.h>
+#include <linux/fib_rules.h>
 #include <netinet/in.h>
 
 #include <time.h>
@@ -185,7 +186,7 @@ static int netlink_enumerate(struct netlink_fd *fd, int family, int type)
 		      (struct sockaddr *) &addr, sizeof(addr)) >= 0;
 }
 
-int netlink_route_add_or_replace(struct netlink_fd *fd, 
+int netlink_route_replace_or_add(struct netlink_fd *fd, 
 	in_addr_t destination, uint32_t masklen, in_addr_t gateway, int iface_index, int table)
 {
 	struct {
@@ -219,12 +220,63 @@ int netlink_route_add_or_replace(struct netlink_fd *fd,
 
 }
 
+int netlink_rule_modify(struct netlink_fd *fd,
+	struct pingu_iface *iface, int type)
+{
+	struct {
+		struct nlmsghdr	nlh;
+		struct rtmsg	msg;
+		char buf[1024];
+	} req;
+	struct sockaddr_nl addr;
+//	uint32_t preference = 1000;
+//	in_addr_t destination = 0;
+
+	memset(&req, 0, sizeof(req));
+	memset(&addr, 0, sizeof(addr));
+	addr.nl_family = AF_NETLINK;
+
+	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+	req.nlh.nlmsg_flags = NLM_F_REQUEST;
+	req.nlh.nlmsg_type = type;
+	if (type == RTM_NEWRULE)
+		req.nlh.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
+	
+	req.msg.rtm_family = AF_INET;
+	req.msg.rtm_table = iface->route_table;
+	req.msg.rtm_protocol = RTPROT_BOOT;
+	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
+	req.msg.rtm_type = RTN_UNICAST;
+
+//	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_PRIORITY, &preference, 4);
+//	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_SRC, &destination, 4);
+	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_OIFNAME, iface->name, strlen(iface->name)+1);
+
+	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
+		      (struct sockaddr *) &addr, sizeof(addr));
+
+}
+
+int netlink_rule_del(struct netlink_fd *fd,	struct pingu_iface *iface)
+{
+	return netlink_rule_modify(fd, iface, RTM_DELRULE);
+}
+
+int netlink_rule_replace_or_add(struct netlink_fd *fd, struct pingu_iface *iface)
+{
+	netlink_rule_del(fd, iface);
+	return netlink_rule_modify(fd, iface, RTM_NEWRULE);
+}
+	
 static void netlink_link_new(struct nlmsghdr *msg)
 {
 	struct pingu_iface *iface;
 	struct ifinfomsg *ifi = NLMSG_DATA(msg);
 	struct rtattr *rta[IFLA_MAX+1];
 	const char *ifname;
+
+	if (!(ifi->ifi_flags & IFF_LOWER_UP))
+		return;
 
 	netlink_parse_rtattr(rta, IFLA_MAX, IFLA_RTA(ifi), IFLA_PAYLOAD(msg));
 	if (rta[IFLA_IFNAME] == NULL)
@@ -236,16 +288,14 @@ static void netlink_link_new(struct nlmsghdr *msg)
 		return;
 
 	if (iface->index == 0 || (ifi->ifi_flags & ifi->ifi_change & IFF_UP)) {
-		log_info("Interface %s: new or configured up",
-			  ifname);
-	} else {
-		log_info("Interface %s: config change",
+		log_info("Interface %s: got link",
 			  ifname);
 	}
 
 	iface->index = ifi->ifi_index;
 	iface->has_link = 1;
 	pingu_iface_bind_socket(iface, 1);
+	netlink_rule_replace_or_add(&talk_fd, iface);
 }
 
 static void netlink_link_del(struct nlmsghdr *msg)
@@ -267,6 +317,7 @@ static void netlink_link_del(struct nlmsghdr *msg)
 	log_info("Interface '%s' deleted", ifname);
 	iface->index = 0;
 	iface->has_link = 0;
+	netlink_rule_del(&talk_fd, iface);
 }
 
 static void netlink_addr_new(struct nlmsghdr *msg)
@@ -287,7 +338,7 @@ static void netlink_addr_new(struct nlmsghdr *msg)
 		return;
 
 	pingu_iface_set_addr(iface, ifa->ifa_family,
-			     RTA_DATA(rta[IFA_LOCAL]), 
+			     RTA_DATA(rta[IFA_LOCAL]),
 			     RTA_PAYLOAD(rta[IFA_LOCAL]));
 }
 
@@ -342,7 +393,7 @@ static void netlink_route_new(struct nlmsghdr *msg)
 	log_debug("New route to %s via %s dev %s table %i", deststr, gwstr,
 		iface->name, iface->route_table);
 
-	netlink_route_add_or_replace(&talk_fd, destination, rtm->rtm_dst_len,
+	netlink_route_replace_or_add(&talk_fd, destination, rtm->rtm_dst_len,
 		gateway, iface->index, iface->route_table);
 }
 
