@@ -383,7 +383,7 @@ static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
 	pingu_iface_set_addr(iface, 0, NULL, 0); 
 }
 
-static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
+static  void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 {
 	struct pingu_iface *iface;
 	struct rtmsg *rtm = NLMSG_DATA(msg);
@@ -426,7 +426,11 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	
 	netlink_route_modify(&talk_fd, action, destination,
 			     rtm->rtm_dst_len, gateway, metric,
-			     iface->index, rtm->rtm_table);	
+			     iface->index, rtm->rtm_table);
+
+	if (destination == 0 && gateway != 0)
+		pingu_iface_gateway(iface, rtm->rtm_family, &gateway,
+				    metric, action);
 }
 
 static void netlink_route_new_cb(struct nlmsghdr *msg)

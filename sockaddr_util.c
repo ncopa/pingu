@@ -1,4 +1,5 @@
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <string.h>
 
@@ -38,4 +39,17 @@ union sockaddr_any *sockaddr_init(union sockaddr_any *sa, int family,
 		break;
 	}
 	return sa;
+}
+
+char *sockaddr_to_string(union sockaddr_any *sa, char *str, size_t size)
+{
+	switch (sa->sa.sa_family) {
+	case AF_INET:
+		inet_ntop(sa->sa.sa_family, &sa->sin.sin_addr, str, size);
+		break;
+	case AF_INET6:
+		inet_ntop(sa->sa.sa_family, &sa->sin6.sin6_addr, str, size);
+		break;
+	}
+	return str;
 }

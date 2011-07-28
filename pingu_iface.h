@@ -36,4 +36,6 @@ int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list);
 void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 			  void *data, int len);
 
+void pingu_iface_gateway(struct pingu_iface *iface, int family,
+			 void *gateway_ptr, int metric, int action);
 #endif

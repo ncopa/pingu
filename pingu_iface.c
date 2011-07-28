@@ -1,6 +1,7 @@
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <linux/rtnetlink.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,6 +108,7 @@ struct pingu_iface *pingu_iface_new(struct ev_loop *loop, const char *name)
 		return NULL;
 	}
 	list_init(&iface->ping_list);
+	list_init(&iface->gateway_list);
 	list_add(&iface->iface_list_entry, &iface_list);
 	return iface;
 }
@@ -137,6 +139,17 @@ void pingu_gateway_add_sorted(struct pingu_iface *iface,
 	list_add_tail(&new_gw->gateway_list_entry, &iface->gateway_list);
 }
 
+void pingu_iface_gateway_dump(struct pingu_iface *iface)
+{
+	struct pingu_gateway *gw;
+	list_for_each_entry(gw, &iface->gateway_list, gateway_list_entry) {
+		char buf[64];
+		sockaddr_to_string(&gw->gw, buf, sizeof(buf));
+		log_debug("dump: %s: via %s metric %i", iface->name, buf,
+			  gw->metric);
+	}
+}
+
 struct pingu_gateway *pingu_gateway_new(int family, void *addr,
 					int metric)
 {
@@ -145,18 +158,8 @@ struct pingu_gateway *pingu_gateway_new(int family, void *addr,
 		log_perror("Failed to allocate gateway");
 		return NULL;
 	}
-	gw->gw.sa.sa_family = family;
+	sockaddr_init(&gw->gw, family, addr);
 	gw->metric = metric;
-	switch (family) {
-	case AF_INET:
-		memcpy(&gw->gw.sin.sin_addr, addr,
-		       sizeof(gw->gw.sin.sin_addr));
-		break;
-	case AF_INET6:
-		memcpy(&gw->gw.sin6.sin6_addr, addr,
-		       sizeof(gw->gw.sin6.sin6_addr));
-		break;
-	}
 	return gw;
 }
 
@@ -165,8 +168,21 @@ void pingu_iface_add_gateway(struct pingu_iface *iface, int family,
 {
 	struct pingu_gateway *gw = pingu_gateway_new(family, addr,
 						     metric);
-	if (gw != NULL)
-		pingu_gateway_add_sorted(iface, gw);
+	if (gw == NULL)
+		return;
+	pingu_gateway_add_sorted(iface, gw);
+	log_debug("%s: added default gateway", iface->name);
+}
+
+void pingu_iface_gateway(struct pingu_iface *iface, int family,
+	void *gateway_ptr, int metric, int action)
+{
+	switch (action) {
+	case RTM_NEWROUTE:
+		pingu_iface_add_gateway(iface, family, gateway_ptr, metric);
+		break;
+	}
+	pingu_iface_gateway_dump(iface);
 }
 
 int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)

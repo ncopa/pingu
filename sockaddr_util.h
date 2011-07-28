@@ -14,5 +14,6 @@ union sockaddr_any {
 int sockaddr_cmp(union sockaddr_any *a, union sockaddr_any *b);
 union sockaddr_any *sockaddr_init(union sockaddr_any *sa, int family,
 				  void *addr);
+char *sockaddr_to_string(union sockaddr_any *sa, char *str, size_t size);
 
 #endif /* SOCKADDR_UTIL_H */
