@@ -18,9 +18,7 @@
 #include "pingu_host.h"
 #include "pingu_iface.h"
 #include "pingu_ping.h"
-
-#define SOCK_ADDR_IN_PTR(sa)	((struct sockaddr_in *)(sa))
-#define SOCK_ADDR_IN_ADDR(sa)	SOCK_ADDR_IN_PTR(sa)->sin_addr
+#include "sockaddr_util.h"
 
 #define PING_SEQ_MAX 32000
 
@@ -58,20 +56,8 @@ static struct pingu_ping *pingu_ping_add(struct ev_loop *loop,
 	return ping;
 }
 
-static int sockaddr_cmp(struct sockaddr *a, struct sockaddr *b)
-{
-	if (a->sa_family != b->sa_family)
-		return -1;
-	switch (a->sa_family) {
-	case AF_INET:
-		return (SOCK_ADDR_IN_ADDR(a).s_addr - SOCK_ADDR_IN_ADDR(b).s_addr);
-		break;
-	}
-	return -1;
-}
-
 static struct pingu_ping *pingu_ping_find(struct icmphdr *icp,
-					  struct sockaddr *from,
+					  union sockaddr_any *from,
 					  struct list_head *ping_list)
 {
 	struct pingu_ping *ping;
@@ -110,7 +96,7 @@ int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
 		return pingu_host_set_status(host, 0) - 1;
 
 	seq = pingu_ping_get_seq();
-	r = icmp_send_ping(host->iface->fd, &host->burst.saddr,
+	r = icmp_send_ping(host->iface->fd, &host->burst.saddr.sa,
 			       sizeof(host->burst.saddr), seq, packetlen);
 	if (r < 0) {
 		if (set_status_on_failure)
@@ -124,18 +110,18 @@ int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
 
 void pingu_ping_read_reply(struct ev_loop *loop, struct pingu_iface *iface)
 {
-	struct sockaddr from;
+	union sockaddr_any from;
 	unsigned char buf[1500];
 	struct iphdr *ip = (struct iphdr *) buf;
 	struct pingu_ping *ping;
 
-	int len = icmp_read_reply(iface->fd, &from, sizeof(from), buf,
+	int len = icmp_read_reply(iface->fd, &from.sa, sizeof(from), buf,
 				  sizeof(buf));
 	if (len <= 0)
 		return;
 	
 	ping = pingu_ping_find((struct icmphdr *) &buf[ip->ihl * 4], &from,
-			       &iface->ping_list);
+				  &iface->ping_list);
 	if (ping == NULL)
 		return;
 

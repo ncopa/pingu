@@ -7,10 +7,11 @@
 #include <ev.h>
 
 #include "list.h"
+#include "sockaddr_util.h"
 
 struct pingu_burst {
-	struct sockaddr saddr; 
-	size_t saddrlen;
+	union sockaddr_any saddr;
+//	size_t saddrlen;
 	int pings_sent;
 	int pings_replied;
 	int active;

@@ -16,6 +16,7 @@
 #include "pingu_host.h"
 #include "pingu_iface.h"
 #include "pingu_ping.h"
+#include "sockaddr_util.h"
 
 static struct list_head iface_list = LIST_INITIALIZER(iface_list);
 
@@ -50,7 +51,8 @@ static int pingu_iface_init_socket(struct ev_loop *loop,
 		return -1;
 	}
 
-	ev_io_init(&iface->socket_watcher, pingu_iface_socket_cb, iface->fd, EV_READ);
+	ev_io_init(&iface->socket_watcher, pingu_iface_socket_cb,
+		   iface->fd, EV_READ);
 	ev_io_start(loop, &iface->socket_watcher);
 	return 0;
 }
@@ -112,20 +114,59 @@ struct pingu_iface *pingu_iface_new(struct ev_loop *loop, const char *name)
 void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 			  void *data, int len)
 {
-	struct sockaddr_in *sin;
-	memset(&iface->primary_addr, 0, sizeof(iface->primary_addr));
-	if (len <= 0) {
+	sockaddr_init(&iface->primary_addr, family, data);
+	if (len <= 0 || data == NULL) {
 		log_debug("%s: address removed", iface->name);
 		return;
 	}
-	iface->primary_addr.sa.sa_family = family;
+	log_debug("%s: new address: %s", iface->name,
+		inet_ntoa(iface->primary_addr.sin.sin_addr));
+}
+
+void pingu_gateway_add_sorted(struct pingu_iface *iface,
+			struct pingu_gateway *new_gw)
+{
+	struct pingu_gateway *gw;
+	list_for_each_entry(gw, &iface->gateway_list, gateway_list_entry) {
+		if (gw->metric > new_gw->metric) {
+			list_add_tail(&new_gw->gateway_list_entry,
+				      &gw->gateway_list_entry);
+			return;
+		}
+	}
+	list_add_tail(&new_gw->gateway_list_entry, &iface->gateway_list);
+}
+
+struct pingu_gateway *pingu_gateway_new(int family, void *addr,
+					int metric)
+{
+	struct pingu_gateway *gw = calloc(1, sizeof(struct pingu_gateway));
+	if (gw == NULL) {
+		log_perror("Failed to allocate gateway");
+		return NULL;
+	}
+	gw->gw.sa.sa_family = family;
+	gw->metric = metric;
 	switch (family) {
 	case AF_INET:
-		sin = (struct sockaddr_in *)&iface->primary_addr;
-		memcpy(&sin->sin_addr, data, len);
-		log_debug("%s: new address: %s", iface->name, inet_ntoa(sin->sin_addr));
+		memcpy(&gw->gw.sin.sin_addr, addr,
+		       sizeof(gw->gw.sin.sin_addr));
+		break;
+	case AF_INET6:
+		memcpy(&gw->gw.sin6.sin6_addr, addr,
+		       sizeof(gw->gw.sin6.sin6_addr));
 		break;
 	}
+	return gw;
+}
+
+void pingu_iface_add_gateway(struct pingu_iface *iface, int family,
+	void *addr, int metric)
+{
+	struct pingu_gateway *gw = pingu_gateway_new(family, addr,
+						     metric);
+	if (gw != NULL)
+		pingu_gateway_add_sorted(iface, gw);
 }
 
 int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)

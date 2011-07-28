@@ -22,6 +22,7 @@ pingu_OBJS = \
 	pingu_iface.o \
 	pingu_netlink.o \
 	pingu_ping.o \
+	sockaddr_util.o \
 	xlib.o
 
 pingu_LIBS = -lev

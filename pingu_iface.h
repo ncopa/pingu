@@ -3,13 +3,9 @@
 
 #include <netinet/in.h>
 #include <ev.h>
-#include "list.h"
 
-union sockaddr_any {
-	struct sockaddr sa;
-	struct sockaddr_in sin;
-	struct sockaddr_in6 sin6;
-};
+#include "sockaddr_util.h"
+#include "list.h"
 
 struct pingu_gateway {
 	union sockaddr_any gw;

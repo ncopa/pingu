@@ -38,7 +38,8 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 	}
 
 	for (rp = ai; rp != NULL; rp = rp->ai_next) {
-		host->burst.saddr = *ai->ai_addr;
+		sockaddr_init(&host->burst.saddr, ai->ai_family,
+			     ai->ai_addr);
 		r = pingu_ping_send(loop, host, 0);
 		if (r == 0)
 			break;
