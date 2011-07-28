@@ -8,7 +8,9 @@
 #include "list.h"
 
 struct pingu_gateway {
-	union sockaddr_any gw;
+	union sockaddr_any gw_addr;
+	union sockaddr_any dest;
+	int dest_len;
 	int metric;
 	struct list_head gateway_list_entry;
 };
@@ -36,6 +38,6 @@ int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list);
 void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 			  void *data, int len);
 
-void pingu_iface_gateway(struct pingu_iface *iface, int family,
-			 void *gateway_ptr, int metric, int action);
+void pingu_iface_gw_action(struct pingu_iface *iface,
+			   struct pingu_gateway *gw, int action);
 #endif

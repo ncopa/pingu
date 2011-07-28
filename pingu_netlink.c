@@ -104,6 +104,20 @@ static int netlink_add_rtattr_l(struct nlmsghdr *n, int maxlen, int type,
 	return TRUE;
 }
 
+static int netlink_add_rtattr_addr_any(struct nlmsghdr *n, int maxlen,
+					int type, union sockaddr_any *sa)
+{
+	switch (sa->sa.sa_family) {
+	case AF_INET:
+		return netlink_add_rtattr_l(n, maxlen, type, &sa->sin.sin_addr, 4);
+		break;
+	case AF_INET6:
+		return netlink_add_rtattr_l(n, maxlen, type, &sa->sin6.sin6_addr, 16);
+		break;
+	}
+	return FALSE;
+}
+
 static int netlink_receive(struct netlink_fd *fd, struct nlmsghdr *reply)
 {
 	struct sockaddr_nl nladdr;
@@ -186,9 +200,9 @@ static int netlink_enumerate(struct netlink_fd *fd, int family, int type)
 		      (struct sockaddr *) &addr, sizeof(addr)) >= 0;
 }
 
-int netlink_route_modify(struct netlink_fd *fd, int type,
-	in_addr_t destination, uint32_t masklen, in_addr_t gateway, 
-	uint32_t metric, int iface_index, int table)
+int netlink_route_modify(struct netlink_fd *fd, int action_type,
+			  struct pingu_gateway *route,
+			  int iface_index, int table)
 {
 	struct {
 		struct nlmsghdr	nlh;
@@ -203,42 +217,42 @@ int netlink_route_modify(struct netlink_fd *fd, int type,
 
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	req.nlh.nlmsg_flags = NLM_F_REQUEST;
-	req.nlh.nlmsg_type = type;
-	if (type == RTM_NEWROUTE)
+	req.nlh.nlmsg_type = action_type;
+	if (action_type == RTM_NEWROUTE)
 		req.nlh.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
 
-	req.msg.rtm_family = AF_INET;
+	req.msg.rtm_family = route->dest.sa.sa_family;
 	req.msg.rtm_table = table;
-	req.msg.rtm_dst_len = masklen;
+	req.msg.rtm_dst_len = route->dest_len;
 	req.msg.rtm_protocol = RTPROT_BOOT;
 	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
 	req.msg.rtm_type = RTN_UNICAST;
 	
-	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_DST, &destination, 4);
+	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), RTA_DST, 
+					&route->dest);
+	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), RTA_GATEWAY,
+					&route->gw_addr);
 	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_OIF, &iface_index, 4);
-	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_GATEWAY, &gateway, 4);
-	if (metric != 0)
-		netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_PRIORITY, &metric, 4);
+	if (route->metric != 0)
+		netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_PRIORITY,
+				     &route->metric, 4);
 
 	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
 		      (struct sockaddr *) &addr, sizeof(addr));
-
 }
 
-int netlink_route_replace_or_add(struct netlink_fd *fd, 
-	in_addr_t destination, uint32_t masklen, in_addr_t gateway,
-	uint32_t metric, int iface_index, int table)
+int netlink_route_replace_or_add(struct netlink_fd *fd,
+				 struct pingu_gateway *route,
+				 int iface_index, int table)
 {
-	return netlink_route_modify(fd, RTM_NEWROUTE, destination, masklen,
-		gateway, metric, iface_index, table);
+	return netlink_route_modify(fd, RTM_NEWROUTE, route, iface_index, table);
 }
 
 int netlink_route_delete(struct netlink_fd *fd, 
-	in_addr_t destination, uint32_t masklen, in_addr_t gateway, 
-	uint32_t metric, int iface_index, int table)
+			 struct pingu_gateway *route,
+			 int iface_index, int table)
 {
-	return netlink_route_modify(fd, RTM_DELROUTE, destination, masklen,
-		gateway, metric, iface_index, table);
+	return netlink_route_modify(fd, RTM_DELROUTE, route, iface_index, table);
 }	
 
 int netlink_rule_modify(struct netlink_fd *fd,
@@ -383,54 +397,80 @@ static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
 	pingu_iface_set_addr(iface, 0, NULL, 0); 
 }
 
-static  void netlink_route_cb_action(struct nlmsghdr *msg, int action)
+static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
+					      struct rtmsg *rtm,
+					      struct rtattr **rta)
+{
+	memset(gw, 0, sizeof(*gw));
+	gw->dest_len = rtm->rtm_dst_len;
+	gw->dest.sa.sa_family = rtm->rtm_family;
+	if (rta[RTA_DST] != NULL)
+		sockaddr_init(&gw->dest, rtm->rtm_family, RTA_DATA(rta[RTA_DST]));
+
+	if (rta[RTA_PRIORITY] != NULL)
+		gw->metric = *(uint32_t *)RTA_DATA(rta[RTA_PRIORITY]);
+
+	if (rta[RTA_GATEWAY] != NULL)
+		sockaddr_init(&gw->gw_addr, rtm->rtm_family, RTA_DATA(rta[RTA_GATEWAY]));
+	return gw;
+}
+
+static void log_route_change(struct pingu_gateway *route,
+			      struct pingu_iface *iface, int action)
+{
+	char deststr[64], gwstr[64];
+	char *actionstr = "New";
+	if (action == RTM_DELROUTE)
+		actionstr = "Delete";
+
+	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
+	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
+	log_debug("%s route to %s via %s dev %s table %i", actionstr,
+		  deststr, gwstr, iface->name, iface->route_table);	
+}
+
+static int is_default_gw(struct pingu_gateway *route)
+{
+	switch (route->dest.sa.sa_family) {
+	case AF_INET:
+		return ((route->dest.sin.sin_addr.s_addr == 0) 
+			 && (route->gw_addr.sin.sin_addr.s_addr != 0));
+		break;
+	case AF_INET6:
+		log_debug("TODO: ipv6");
+		break;
+	}
+	return FALSE;
+}
+		
+static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 {
 	struct pingu_iface *iface;
 	struct rtmsg *rtm = NLMSG_DATA(msg);
 	struct rtattr *rta[RTA_MAX+1];
 
-	in_addr_t destination = 0;
-	in_addr_t gateway = 0;
-	uint32_t metric = 0;
-	char deststr[64], gwstr[64];
-	char *actionstr = "New";
-	if (action == RTM_DELROUTE)
-		actionstr = "Delete";
+	struct pingu_gateway route;
 	
 	/* ignore route changes that we made ourselves via talk_fd */
 	if (msg->nlmsg_pid == getpid())
 		return;
-		
+	
 	netlink_parse_rtattr(rta, RTA_MAX, RTM_RTA(rtm), RTM_PAYLOAD(msg));
 	if (rta[RTA_OIF] == NULL || rta[RTA_GATEWAY] == NULL
 	    || rtm->rtm_family != PF_INET || rtm->rtm_table != RT_TABLE_MAIN)
 		return;
 
-	if (rta[RTA_DST] != NULL)
-		destination = *(in_addr_t *)RTA_DATA(rta[RTA_DST]);
-
-	if (rta[RTA_PRIORITY] != NULL)
-		metric = *(uint32_t *)RTA_DATA(rta[RTA_PRIORITY]);
-
+	gw_from_rtmsg(&route, rtm, rta);
 	iface = pingu_iface_get_by_index(*(int*)RTA_DATA(rta[RTA_OIF]));
 	if (iface == NULL)
 		return;
 
-	gateway = *(in_addr_t *)RTA_DATA(rta[RTA_GATEWAY]);
+	log_route_change(&route, iface, action);
+	netlink_route_modify(&talk_fd, action, &route,
+			     iface->index, iface->route_table);
 
-	inet_ntop(rtm->rtm_family, &destination, deststr, sizeof(deststr));
-	inet_ntop(rtm->rtm_family, &gateway, gwstr, sizeof(gwstr));
-
-	log_debug("%s route to %s via %s dev %s table %i", actionstr,
-		  deststr, gwstr, iface->name, iface->route_table);
-	
-	netlink_route_modify(&talk_fd, action, destination,
-			     rtm->rtm_dst_len, gateway, metric,
-			     iface->index, rtm->rtm_table);
-
-	if (destination == 0 && gateway != 0)
-		pingu_iface_gateway(iface, rtm->rtm_family, &gateway,
-				    metric, action);
+	if (is_default_gw(&route))
+		pingu_iface_gw_action(iface, &route, action);
 }
 
 static void netlink_route_new_cb(struct nlmsghdr *msg)
