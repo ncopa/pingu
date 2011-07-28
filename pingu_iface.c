@@ -175,6 +175,41 @@ struct pingu_gateway *pingu_gateway_clone(struct pingu_gateway *gw)
 	return new_gw;
 }
 
+static void log_debug_gw(char *msg, struct pingu_gateway *gw)
+{
+	char destbuf[64], gwaddrbuf[64];
+	log_debug("%s: %s/%i via %s metric %i", msg,
+		  sockaddr_to_string(&gw->dest, destbuf, sizeof(destbuf)),
+		  gw->dest_len,
+		  sockaddr_to_string(&gw->gw_addr, gwaddrbuf, sizeof(gwaddrbuf)),
+		  gw->metric);
+}
+
+static int gateway_cmp(struct pingu_gateway *a, struct pingu_gateway *b)
+{
+	int r;
+	if (a->dest_len != b->dest_len)
+		return a->dest_len - b->dest_len;
+	r = sockaddr_cmp(&a->dest, &b->dest);
+	if (r != 0)
+		return r;
+	r = sockaddr_cmp(&a->gw_addr, &b->gw_addr);
+	if (r != 0)
+		return r;
+	return a->metric - b->metric;
+}
+	
+static struct pingu_gateway *pingu_gateway_get(struct pingu_iface *iface,
+			struct pingu_gateway *gw)
+{
+	struct pingu_gateway *entry;
+	list_for_each_entry(entry, &iface->gateway_list, gateway_list_entry) {
+		if (gateway_cmp(entry, gw) == 0)
+			return entry;
+	}
+	return NULL;
+}
+
 void pingu_iface_add_gateway(struct pingu_iface *iface,
 			     struct pingu_gateway *gw)
 {
@@ -185,12 +220,26 @@ void pingu_iface_add_gateway(struct pingu_iface *iface,
 	log_debug("%s: added default gateway", iface->name);
 }
 
+void pingu_iface_del_gateway(struct pingu_iface *iface,
+			     struct pingu_gateway *delete)
+{
+	struct pingu_gateway *gw = pingu_gateway_get(iface, delete);
+	if (gw == NULL)		
+		return;
+	log_debug_gw("removed", gw);
+	list_del(&gw->gateway_list_entry);
+	free(gw); 
+}
+
 void pingu_iface_gw_action(struct pingu_iface *iface, 
 			 struct pingu_gateway *gw, int action)
 {
 	switch (action) {
 	case RTM_NEWROUTE:
 		pingu_iface_add_gateway(iface, gw);
+		break;
+	case RTM_DELROUTE:
+		pingu_iface_del_gateway(iface, gw);
 		break;
 	}
 	pingu_iface_gateway_dump(iface);
