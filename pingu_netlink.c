@@ -383,7 +383,7 @@ static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
 	pingu_iface_set_addr(iface, 0, NULL, 0); 
 }
 
-static void netlink_route_new_cb(struct nlmsghdr *msg)
+static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 {
 	struct pingu_iface *iface;
 	struct rtmsg *rtm = NLMSG_DATA(msg);
@@ -393,6 +393,9 @@ static void netlink_route_new_cb(struct nlmsghdr *msg)
 	in_addr_t gateway = 0;
 	uint32_t metric = 0;
 	char deststr[64], gwstr[64];
+	char *actionstr = "New";
+	if (action == RTM_DELROUTE)
+		actionstr = "Delete";
 	
 	/* ignore route changes that we made ourselves via talk_fd */
 	if (msg->nlmsg_pid == getpid())
@@ -418,53 +421,23 @@ static void netlink_route_new_cb(struct nlmsghdr *msg)
 	inet_ntop(rtm->rtm_family, &destination, deststr, sizeof(deststr));
 	inet_ntop(rtm->rtm_family, &gateway, gwstr, sizeof(gwstr));
 
-	log_debug("New route to %s via %s dev %s table %i", deststr, gwstr,
-		iface->name, iface->route_table);
-
-	netlink_route_replace_or_add(&talk_fd, destination, rtm->rtm_dst_len,
-		gateway, metric, iface->index, iface->route_table);
+	log_debug("%s route to %s via %s dev %s table %i", actionstr,
+		  deststr, gwstr, iface->name, iface->route_table);
+	
+	netlink_route_modify(&talk_fd, action, destination,
+			     rtm->rtm_dst_len, gateway, metric,
+			     iface->index, rtm->rtm_table);	
 }
+
+static void netlink_route_new_cb(struct nlmsghdr *msg)
+{
+	netlink_route_cb_action(msg, RTM_NEWROUTE);
+}
+
 
 static void netlink_route_del_cb(struct nlmsghdr *msg)
 {
-	struct pingu_iface *iface;
-	struct rtmsg *rtm = NLMSG_DATA(msg);
-	struct rtattr *rta[RTA_MAX+1];
-
-	in_addr_t destination = 0;
-	in_addr_t gateway = 0;
-	uint32_t metric = 0;
-	char deststr[64], gwstr[64];
-	
-	/* ignore route changes that we made ourselves via talk_fd */
-	if (msg->nlmsg_pid == getpid())
-		return;
-		
-	netlink_parse_rtattr(rta, RTA_MAX, RTM_RTA(rtm), RTM_PAYLOAD(msg));
-	if (rta[RTA_OIF] == NULL || rta[RTA_GATEWAY] == NULL
-	    || rtm->rtm_family != PF_INET || rtm->rtm_table != RT_TABLE_MAIN)
-		return;
-
-	if (rta[RTA_DST] != NULL)
-		destination = *(in_addr_t *)RTA_DATA(rta[RTA_DST]);
-
-	if (rta[RTA_PRIORITY] != NULL)
-		metric = *(uint32_t *)RTA_DATA(rta[RTA_PRIORITY]);
-
-	iface = pingu_iface_get_by_index(*(int*)RTA_DATA(rta[RTA_OIF]));
-	if (iface == NULL)
-		return;
-
-	gateway = *(in_addr_t *)RTA_DATA(rta[RTA_GATEWAY]);
-
-	inet_ntop(rtm->rtm_family, &destination, deststr, sizeof(deststr));
-	inet_ntop(rtm->rtm_family, &gateway, gwstr, sizeof(gwstr));
-
-	log_debug("Delete route to %s via %s dev %s table %i", deststr, gwstr,
-		iface->name, iface->route_table);
-
-	netlink_route_delete(&talk_fd, destination, rtm->rtm_dst_len,
-		gateway, metric, iface->index, iface->route_table);
+	netlink_route_cb_action(msg, RTM_DELROUTE);
 }
 
 static const netlink_dispatch_f route_dispatch[RTM_MAX] = {
