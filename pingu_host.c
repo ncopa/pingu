@@ -156,7 +156,7 @@ static char *get_provider_gateway(struct pingu_host *p)
 	return p->host;
 }
 
-static void exec_route_change(void)
+static void exec_route_change_hook(void)
 {
 	struct pingu_host *host;
 	struct list_head *n;
@@ -240,7 +240,7 @@ int pingu_host_set_status(struct pingu_host *host, int status)
 	}
 	if (action != NULL)
 		execute_action(action);
-	exec_route_change();
+	exec_route_change_hook();
 	return status;
 }
 

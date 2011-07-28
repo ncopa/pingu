@@ -118,7 +118,7 @@ void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 		log_debug("%s: address removed", iface->name);
 		return;
 	}
-	iface->primary_addr.sa_family = family;
+	iface->primary_addr.sa.sa_family = family;
 	switch (family) {
 	case AF_INET:
 		sin = (struct sockaddr_in *)&iface->primary_addr;

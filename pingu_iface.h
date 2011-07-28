@@ -1,8 +1,21 @@
 #ifndef PINGU_IFACE_H
 #define PINGU_IFACE_H
 
+#include <netinet/in.h>
 #include <ev.h>
 #include "list.h"
+
+union sockaddr_any {
+	struct sockaddr sa;
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
+};
+
+struct pingu_gateway {
+	union sockaddr_any gw;
+	int metric;
+	struct list_head gateway_list_entry;
+};
 
 struct pingu_iface {
 	char name[32];
@@ -10,10 +23,11 @@ struct pingu_iface {
 	int has_binding;
 	int has_link;
 	int fd;
-	struct sockaddr primary_addr;
+	union sockaddr_any primary_addr;
 	int route_table;
 	struct list_head iface_list_entry;
 	struct list_head ping_list;
+	struct list_head gateway_list;
 	struct ev_io socket_watcher;
 };
 
