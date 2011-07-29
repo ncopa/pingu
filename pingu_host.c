@@ -227,13 +227,11 @@ int pingu_host_set_status(struct pingu_host *host, int status)
 	int route_action = 0;
 	host->burst.active = 0;
 	if (host->status == status) {
-		log_debug("%s: %s: status is still %i",
-			host->iface->name, host->host, status);
+		log_debug("%s: status is still %i", host->label, status);
 		return status;
 	}
 	host->status = status;
-	log_info("%s: %s: new status: %i",
-		host->iface->name, host->host, status);
+	log_info("%s: new status: %i", host->label, status);
 	switch (host->status) {
 	case 0:
 		action = host->down_action;

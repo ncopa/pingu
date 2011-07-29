@@ -33,7 +33,7 @@ static void pingu_ping_timeout_cb(struct ev_loop *loop, ev_timer *w,
 				  int revents)
 {
 	struct pingu_ping *ping = container_of(w, struct pingu_ping, timeout_watcher);
-	log_debug("%s: seq %i (%i/%i) timed out", ping->host->host, ping->seq,
+	log_debug("%s: seq %i (%i/%i) timed out", ping->host->label, ping->seq,
 		ping->host->burst.pings_sent, ping->host->max_retries);
 	list_del(&ping->ping_list_entry);
 	pingu_host_verify_status(loop, ping->host);
@@ -76,7 +76,7 @@ static void pingu_ping_handle_reply(struct ev_loop *loop,
 				    struct pingu_ping *ping)
 {
 	ping->host->burst.pings_replied++;
-	log_debug("%s: got seq %i (%i/%i)", ping->host->host, ping->seq,
+	log_debug("%s: got seq %i (%i/%i)", ping->host->label, ping->seq,
 		  ping->host->burst.pings_replied,
 		  ping->host->required_replies);
 	list_del(&ping->ping_list_entry);
@@ -119,7 +119,6 @@ void pingu_ping_read_reply(struct ev_loop *loop, struct pingu_iface *iface)
 				  sizeof(buf));
 	if (len <= 0)
 		return;
-	
 	ping = pingu_ping_find((struct icmphdr *) &buf[ip->ihl * 4], &from,
 				  &iface->ping_list);
 	if (ping == NULL)
