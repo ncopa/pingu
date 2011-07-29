@@ -17,6 +17,7 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 	struct addrinfo hints;
 	struct addrinfo *ai, *rp;
 	int r;
+	char buf[64];
 
 	/* we bind to device every burst in case an iface disappears and
 	   comes back. e.g ppp0 */
@@ -38,16 +39,17 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 	}
 
 	for (rp = ai; rp != NULL; rp = rp->ai_next) {
-		sockaddr_init(&host->burst.saddr, ai->ai_family,
-			     ai->ai_addr);
+		sockaddr_from_addrinfo(&host->burst.saddr, ai);
 		r = pingu_ping_send(loop, host, 0);
 		if (r == 0)
 			break;
 	}
 
-	if (rp == NULL)
+	sockaddr_to_string(&host->burst.saddr, buf, sizeof(buf));
+	if (rp == NULL) {
+		log_debug("%s: failed to send first ping to %s", host->label, buf);
 		host->burst.active = 0;
-	
+	}
 }
 
 void pingu_burst_timeout_cb(struct ev_loop *loop, struct ev_timer *w,
@@ -59,6 +61,6 @@ void pingu_burst_timeout_cb(struct ev_loop *loop, struct ev_timer *w,
 		log_warning("%s: burst already active", host->host);
 		return;
 	}
-	log_debug("%s: new burst", host->host);
+	log_debug("%s: new burst to %s via %s", host->label, host->host, host->iface->name);
 	ping_burst_start(loop, host);
 }
