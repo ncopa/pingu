@@ -17,6 +17,7 @@
 #include "pingu_host.h"
 #include "pingu_iface.h"
 #include "pingu_ping.h"
+#include "pingu_netlink.h"
 #include "sockaddr_util.h"
 
 static struct list_head iface_list = LIST_INITIALIZER(iface_list);
@@ -243,6 +244,14 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 		break;
 	}
 	pingu_iface_gateway_dump(iface);
+}
+
+void pingu_iface_update_routes(struct pingu_iface *iface, int action)
+{
+	struct pingu_gateway *route;
+	list_for_each_entry(route, &iface->gateway_list, gateway_list_entry) {
+		kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
+	}
 }
 
 int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)

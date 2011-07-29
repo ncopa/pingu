@@ -40,4 +40,6 @@ void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 
 void pingu_iface_gw_action(struct pingu_iface *iface,
 			   struct pingu_gateway *gw, int action);
+void pingu_iface_update_routes(struct pingu_iface *iface, int action);
+
 #endif

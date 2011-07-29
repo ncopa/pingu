@@ -1,4 +1,7 @@
 
+#include <arpa/inet.h>
+#include <linux/rtnetlink.h>
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -221,6 +224,7 @@ static void execute_action(const char *action)
 int pingu_host_set_status(struct pingu_host *host, int status)
 {
 	const char *action;
+	int route_action = 0;
 	host->burst.active = 0;
 	if (host->status == status) {
 		log_debug("%s: %s: status is still %i",
@@ -233,13 +237,16 @@ int pingu_host_set_status(struct pingu_host *host, int status)
 	switch (host->status) {
 	case 0:
 		action = host->down_action;
+		route_action = RTM_DELROUTE;
 		break;
 	case 1:
 		action = host->up_action;
+		route_action =  RTM_NEWROUTE;
 		break;
 	}
 	if (action != NULL)
 		execute_action(action);
+	pingu_iface_update_routes(host->iface, route_action);
 	exec_route_change_hook();
 	return status;
 }

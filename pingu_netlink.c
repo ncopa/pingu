@@ -416,7 +416,7 @@ static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
 }
 
 static void log_route_change(struct pingu_gateway *route,
-			      struct pingu_iface *iface, int action)
+			     char *ifname, int table, int action)
 {
 	char deststr[64], gwstr[64];
 	char *actionstr = "New";
@@ -426,7 +426,7 @@ static void log_route_change(struct pingu_gateway *route,
 	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
 	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
 	log_debug("%s route to %s via %s dev %s table %i", actionstr,
-		  deststr, gwstr, iface->name, iface->route_table);	
+		  deststr, gwstr, ifname, table);	
 }
 
 static int is_default_gw(struct pingu_gateway *route)
@@ -465,7 +465,7 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	if (iface == NULL)
 		return;
 
-	log_route_change(&route, iface, action);
+	log_route_change(&route, iface->name, iface->route_table, action);
 	netlink_route_modify(&talk_fd, action, &route,
 			     iface->index, iface->route_table);
 
@@ -552,6 +552,13 @@ error:
 	return FALSE;
 }
 
+
+int kernel_route_modify(int action, struct pingu_gateway *route,
+			struct pingu_iface *iface, int table)
+{
+	log_route_change(route, iface->name, table, action);
+	return netlink_route_modify(&talk_fd, action, route, iface->index, table);
+}
 
 int kernel_init(struct ev_loop *loop)
 {
