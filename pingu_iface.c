@@ -89,7 +89,7 @@ struct pingu_iface *pingu_iface_get_by_index(int index)
 	return NULL;
 }
 
-struct pingu_iface *pingu_iface_new(struct ev_loop *loop, const char *name)
+struct pingu_iface *pingu_iface_new(const char *name)
 {
 	struct pingu_iface *iface = pingu_iface_get_by_name(name);
 	if (iface != NULL)
@@ -104,10 +104,6 @@ struct pingu_iface *pingu_iface_new(struct ev_loop *loop, const char *name)
 	if (name != NULL)
 		strlcpy(iface->name, name, sizeof(iface->name));
 	
-	if (pingu_iface_init_socket(loop, iface) == -1) {
-		free(iface);
-		return NULL;
-	}
 	list_init(&iface->ping_list);
 	list_init(&iface->gateway_list);
 	list_add(&iface->iface_list_entry, &iface_list);
@@ -266,13 +262,19 @@ int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)
 	list_for_each_entry(host, host_list, host_list_entry) {
 		iface = pingu_iface_get_by_name(host->interface);
 		if (iface == NULL) {
-			iface = pingu_iface_new(loop, host->interface);
+			iface = pingu_iface_new(host->interface);
 			iface->route_table = autotbl++;
 		}
 		if (iface == NULL)
 			return -1;
 		host->iface = iface;
 	}
+
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (pingu_iface_init_socket(loop, iface) == -1)
+			return -1;
+	}
+
 	return 0;
 }
 
