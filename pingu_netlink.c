@@ -223,10 +223,10 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 
 	req.msg.rtm_family = route->dest.sa.sa_family;
 	req.msg.rtm_table = table;
-	req.msg.rtm_dst_len = route->dest_len;
-	req.msg.rtm_protocol = RTPROT_BOOT;
-	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
-	req.msg.rtm_type = RTN_UNICAST;
+	req.msg.rtm_dst_len = route->dst_len;
+	req.msg.rtm_protocol = route->protocol;
+	req.msg.rtm_scope = route->scope;
+	req.msg.rtm_type = route->type;
 	
 	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), RTA_DST, 
 					&route->dest);
@@ -266,6 +266,7 @@ int netlink_rule_modify(struct netlink_fd *fd,
 	struct sockaddr_nl addr;
 //	uint32_t preference = 1000;
 //	in_addr_t destination = 0;
+	char buf[64];
 
 	memset(&req, 0, sizeof(req));
 	memset(&addr, 0, sizeof(addr));
@@ -284,8 +285,12 @@ int netlink_rule_modify(struct netlink_fd *fd,
 	req.msg.rtm_type = RTN_UNICAST;
 
 //	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_PRIORITY, &preference, 4);
-//	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_SRC, &destination, 4);
-	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_OIFNAME, iface->name, strlen(iface->name)+1);
+
+	req.msg.rtm_src_len = 32;
+	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), FRA_SRC,
+				    &iface->primary_addr);
+	sockaddr_to_string(&iface->primary_addr, buf, sizeof(buf));
+//	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_OIFNAME, iface->name, strlen(iface->name)+1);
 
 	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
 		      (struct sockaddr *) &addr, sizeof(addr));
@@ -330,7 +335,6 @@ static void netlink_link_new_cb(struct nlmsghdr *msg)
 	iface->index = ifi->ifi_index;
 	iface->has_link = 1;
 	pingu_iface_bind_socket(iface, 1);
-	netlink_rule_replace_or_add(&talk_fd, iface);
 }
 
 static void netlink_link_del_cb(struct nlmsghdr *msg)
@@ -352,7 +356,6 @@ static void netlink_link_del_cb(struct nlmsghdr *msg)
 	log_info("Interface '%s' deleted", ifname);
 	iface->index = 0;
 	iface->has_link = 0;
-	netlink_rule_del(&talk_fd, iface);
 }
 
 static void netlink_addr_new_cb(struct nlmsghdr *msg)
@@ -375,6 +378,7 @@ static void netlink_addr_new_cb(struct nlmsghdr *msg)
 	pingu_iface_set_addr(iface, ifa->ifa_family,
 			     RTA_DATA(rta[IFA_LOCAL]),
 			     RTA_PAYLOAD(rta[IFA_LOCAL]));
+	netlink_rule_replace_or_add(&talk_fd, iface);
 }
 
 static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
@@ -394,7 +398,8 @@ static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
 	if (iface == NULL)
 		return;
 
-	pingu_iface_set_addr(iface, 0, NULL, 0); 
+	pingu_iface_set_addr(iface, 0, NULL, 0);
+	netlink_rule_del(&talk_fd, iface);
 }
 
 static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
@@ -402,8 +407,16 @@ static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
 					      struct rtattr **rta)
 {
 	memset(gw, 0, sizeof(*gw));
-	gw->dest_len = rtm->rtm_dst_len;
+	gw->dst_len = rtm->rtm_dst_len;
+	gw->src_len = rtm->rtm_src_len;
 	gw->dest.sa.sa_family = rtm->rtm_family;
+	gw->protocol = rtm->rtm_protocol;
+	gw->scope = rtm->rtm_scope;
+	gw->type = rtm->rtm_type;
+	
+	if (rta[RTA_SRC] != NULL)
+		sockaddr_init(&gw->src, rtm->rtm_family, RTA_DATA(rta[RTA_SRC]));
+		
 	if (rta[RTA_DST] != NULL)
 		sockaddr_init(&gw->dest, rtm->rtm_family, RTA_DATA(rta[RTA_DST]));
 
@@ -425,8 +438,8 @@ static void log_route_change(struct pingu_gateway *route,
 
 	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
 	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
-	log_debug("%s route to %s via %s dev %s table %i", actionstr,
-		  deststr, gwstr, ifname, table);	
+	log_debug("%s route to %s/%i via %s dev %s table %i", actionstr,
+		  deststr, route->dst_len, gwstr, ifname, table);	
 }
 
 static int is_default_gw(struct pingu_gateway *route)
@@ -456,8 +469,8 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 		return;
 	
 	netlink_parse_rtattr(rta, RTA_MAX, RTM_RTA(rtm), RTM_PAYLOAD(msg));
-	if (rta[RTA_OIF] == NULL || rta[RTA_GATEWAY] == NULL
-	    || rtm->rtm_family != PF_INET || rtm->rtm_table != RT_TABLE_MAIN)
+	if (rta[RTA_OIF] == NULL || rtm->rtm_family != PF_INET 
+	    || rtm->rtm_table != RT_TABLE_MAIN)
 		return;
 
 	gw_from_rtmsg(&route, rtm, rta);

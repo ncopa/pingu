@@ -171,8 +171,12 @@ struct pingu_gateway *pingu_gateway_clone(struct pingu_gateway *gw)
 	/* copy the fields without overwriting the list entry */
 	memcpy(&new_gw->dest, &gw->dest, sizeof(new_gw->dest));
 	memcpy(&new_gw->gw_addr, &gw->gw_addr, sizeof(new_gw->gw_addr));
+	new_gw->dst_len = gw->dst_len;
+	new_gw->src_len = gw->src_len;
 	new_gw->metric = gw->metric;
-	new_gw->dest_len = gw->dest_len;
+	new_gw->protocol = gw->protocol;
+	new_gw->scope = gw->scope;
+	new_gw->type = gw->type;
 	return new_gw;
 }
 
@@ -181,7 +185,7 @@ static void log_debug_gw(char *msg, struct pingu_gateway *gw)
 	char destbuf[64], gwaddrbuf[64];
 	log_debug("%s: %s/%i via %s metric %i", msg,
 		  sockaddr_to_string(&gw->dest, destbuf, sizeof(destbuf)),
-		  gw->dest_len,
+		  gw->dst_len,
 		  sockaddr_to_string(&gw->gw_addr, gwaddrbuf, sizeof(gwaddrbuf)),
 		  gw->metric);
 }
@@ -189,8 +193,8 @@ static void log_debug_gw(char *msg, struct pingu_gateway *gw)
 static int gateway_cmp(struct pingu_gateway *a, struct pingu_gateway *b)
 {
 	int r;
-	if (a->dest_len != b->dest_len)
-		return a->dest_len - b->dest_len;
+	if (a->dst_len != b->dst_len)
+		return a->dst_len - b->dst_len;
 	r = sockaddr_cmp(&a->dest, &b->dest);
 	if (r != 0)
 		return r;

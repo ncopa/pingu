@@ -10,8 +10,14 @@
 struct pingu_gateway {
 	union sockaddr_any gw_addr;
 	union sockaddr_any dest;
-	int dest_len;
+	union sockaddr_any src;
+	unsigned char dst_len;
+	unsigned char src_len;
+	
 	int metric;
+	unsigned char protocol;
+	unsigned char scope;
+	unsigned char type;	
 	struct list_head gateway_list_entry;
 };
 
