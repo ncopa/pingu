@@ -18,6 +18,7 @@ pingu_OBJS = \
 	log.o \
 	pingu.o \
 	pingu_burst.o \
+	pingu_conf.o \
 	pingu_host.o \
 	pingu_iface.o \
 	pingu_netlink.o \

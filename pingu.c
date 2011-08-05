@@ -12,13 +12,11 @@
 
 #include <ev.h>
 
-#include "icmp.h"
-#include "pingu.h"
-#include "xlib.h"
 #include "log.h"
-#include "list.h"
 
+#include "pingu_conf.h"
 #include "pingu_host.h"
+#include "pingu_iface.h"
 #include "pingu_netlink.h"
 
 #ifndef DEFAULT_CONFIG
@@ -146,7 +144,16 @@ int main(int argc, char *argv[])
 
 	log_init(verbose);
 	loop = ev_default_loop(0);
-	pingu_host_init(loop, config_file);
+	
+	if (pingu_conf_read(config_file) < 0)
+		return 1;
+	
+	if (pingu_iface_init(loop) < 0)
+		return 1;
+	
+	if (pingu_host_init(loop) < 0)
+		return 1;
+	
 	kernel_init(loop);
 
 	if (pingu_daemonize) {

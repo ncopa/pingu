@@ -8,14 +8,10 @@
 struct pingu_host {
 	struct list_head host_list_entry;
 	char *host;
-	char *source_ip;
 	char *label;
-	char *interface;
-	char *gateway;
-	char *up_action;
-	char *down_action;
+	const char *up_action;
+	const char *down_action;
 	int status;
-	int iface_route_table;
 	int max_retries;
 	int required_replies;
 	ev_tstamp timeout;
@@ -26,8 +22,13 @@ struct pingu_host {
 	struct pingu_iface *iface;
 };
 
+struct pingu_host *pingu_host_new(char *hoststr, float burst_interval,
+				  int max_retries, int required_replies,
+				  float timeout, 
+				  const char *up_action,
+				  const char *down_action);
 int pingu_host_set_status(struct pingu_host *host, int status);
-int pingu_host_init(struct ev_loop *loop, const char *config_file);
+int pingu_host_init(struct ev_loop *loop);
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host);
 
 #endif

@@ -22,6 +22,10 @@
 
 static struct list_head iface_list = LIST_INITIALIZER(iface_list);
 
+#define PINGU_ROUTE_TABLE_MIN 1
+#define PINGU_ROUTE_TABLE_MAX 253
+unsigned char used_route_table[256];
+
 static void pingu_iface_socket_cb(struct ev_loop *loop, struct ev_io *w,
 				 int revents)
 {
@@ -71,10 +75,11 @@ struct pingu_iface *pingu_iface_get_by_name(const char *name)
 	struct pingu_iface *iface;
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
 		if (name == NULL) {
-			if (iface->name[0] == '\n')
+			if (iface->name[0] == '\0')
 				return iface;
-		} else if (strncmp(name, iface->name, sizeof(iface->name)) == 0)
+		} else if (strncmp(name, iface->name, sizeof(iface->name)) == 0) {
 			return iface;
+		}
 	}
 	return NULL;
 }
@@ -89,7 +94,7 @@ struct pingu_iface *pingu_iface_get_by_index(int index)
 	return NULL;
 }
 
-struct pingu_iface *pingu_iface_new(const char *name)
+struct pingu_iface *pingu_iface_get_by_name_or_new(const char *name)
 {
 	struct pingu_iface *iface = pingu_iface_get_by_name(name);
 	if (iface != NULL)
@@ -254,27 +259,36 @@ void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 	}
 }
 
-int pingu_iface_init(struct ev_loop *loop, struct list_head *host_list)
+int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
 {
-	struct pingu_host *host;
-	struct pingu_iface *iface;
-	int autotbl = 10;
-	list_for_each_entry(host, host_list, host_list_entry) {
-		iface = pingu_iface_get_by_name(host->interface);
-		if (iface == NULL) {
-			iface = pingu_iface_new(host->interface);
-			iface->route_table = autotbl++;
-		}
-		if (iface == NULL)
-			return -1;
-		host->iface = iface;
+	static int initialized = 0;
+	int i = 1;
+	if (!initialized) {
+		memset(used_route_table, 0, sizeof(used_route_table));
+		initialized = 1;
 	}
+	if (table == PINGU_ROUTE_TABLE_AUTO) {
+		while (i < 253 && used_route_table[i])
+			i++;
+		table = i;
+	}
+	if (table < PINGU_ROUTE_TABLE_MIN || table >= PINGU_ROUTE_TABLE_MAX) {
+		log_error("Invalid route table %i", table);
+		return -1;
+	}
+	used_route_table[table] = 1;
+	iface->route_table = table;
+	return table;
+}
 
+int pingu_iface_init(struct ev_loop *loop)
+{
+	struct pingu_iface *iface;
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (iface->route_table == 0)
+			pingu_iface_set_route_table(iface, PINGU_ROUTE_TABLE_AUTO);
 		if (pingu_iface_init_socket(loop, iface) == -1)
 			return -1;
 	}
-
 	return 0;
 }
-
