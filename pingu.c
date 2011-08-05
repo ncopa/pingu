@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 	log_init(verbose);
 	loop = ev_default_loop(0);
 	
-	if (pingu_conf_read(config_file) < 0)
+	if (pingu_conf_parse(config_file) < 0)
 		return 1;
 	
 	if (pingu_iface_init(loop) < 0)

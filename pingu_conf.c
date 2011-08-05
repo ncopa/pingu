@@ -9,6 +9,12 @@
 #include "pingu_host.h"
 #include "xlib.h"
 
+struct pingu_conf {
+	const char *filename;
+	FILE *fh;
+	int lineno;
+};
+
 static float default_burst_interval = 30.0;
 static float default_timeout = 1.0;
 static int default_max_retries = 5;
@@ -55,12 +61,27 @@ static void parse_line(char *line, char **key, char **value)
 	(*value) = p;
 }
 
-static FILE *pingu_conf_open(const char *filename)
+static struct pingu_conf *pingu_conf_open(const char *filename)
 {
-	FILE *f = fopen(filename, "r");
-	if (f == NULL)
+	struct pingu_conf *f = calloc(1, sizeof(struct pingu_conf));
+	if (f == NULL) {
+		log_perror("calloc");
+		return NULL;
+	}
+	f->fh = fopen(filename, "r");
+	if (f->fh == NULL) {
 		log_perror(filename);
+		free(f);
+		return NULL;
+	}
+	f->filename = filename;
 	return f;
+}
+
+static void pingu_conf_close(struct pingu_conf *f)
+{
+	fclose(f->fh);
+	free(f);
 }
 
 static char *chomp_bracket(char *str)
@@ -73,14 +94,15 @@ static char *chomp_bracket(char *str)
 	return str;
 }
 
-static char *pingu_conf_get_key_value(FILE *f, char **key, char **value, int *lineno)
+static char *pingu_conf_read_key_value(struct pingu_conf *conf, char **key,
+				       char **value)
 {
 	static char line[1024];
 	char *k = NULL, *v = NULL;
 	while (k == NULL || *k == '\0') {
-		if (fgets(line, sizeof(line), f) == NULL)
+		if (fgets(line, sizeof(line), conf->fh) == NULL)
 			return NULL;
-		(*lineno)++;
+		conf->lineno++;
 		parse_line(line, &k, &v);
 	}
 	*key = k;
@@ -88,16 +110,14 @@ static char *pingu_conf_get_key_value(FILE *f, char **key, char **value, int *li
 	return line;
 }
 
-
-
-static int pingu_conf_read_iface(FILE *f, char *ifname, int *lineno)
+static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 {
 	struct pingu_iface *iface;
 	char *key, *value;
 
 	iface = pingu_iface_get_by_name(value);
 	if (iface != NULL) {
-		log_error("Interface %s already declared");
+		log_error("Interface %s already declared (line %i)", conf->lineno);
 		return -1;
 	}
 
@@ -105,20 +125,20 @@ static int pingu_conf_read_iface(FILE *f, char *ifname, int *lineno)
 	if (iface == NULL)
 		return -1;
 
-	while (pingu_conf_get_key_value(f, &key, &value, lineno)) {
+	while (pingu_conf_read_key_value(conf, &key, &value)) {
 		if (key == NULL || key[0] == '}')
 			break;
 		if (strcmp(key, "route-table") == 0) {
 			pingu_iface_set_route_table(iface, atoi(value));
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
-				  *lineno);
+				  conf->lineno);
 		}
 	}
 	return 0;
 }
 
-static int pingu_conf_read_host(FILE *f, char *hoststr, int *lineno)
+static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 {
 	char *key, *value;
 	struct pingu_host *host;
@@ -127,14 +147,14 @@ static int pingu_conf_read_host(FILE *f, char *hoststr, int *lineno)
 			      default_max_retries, default_required_replies,
 			      default_timeout, default_up_action,
 			      default_down_action);
-	while (pingu_conf_get_key_value(f, &key, &value, lineno)) {
+	while (pingu_conf_read_key_value(conf, &key, &value)) {
 		if (key == NULL || key[0] == '}')
 			break;
 		if (strcmp(key, "bind-interface") == 0) {
 			host->iface = pingu_iface_get_by_name_or_new(value);
 			if (host->iface == NULL) {
 				log_error("Undefined interface %s on line %i",
-					   value, *lineno);
+					   value, conf->lineno);
 				return -1;
 			}
 		} else if (strcmp(key, "label") == 0) {
@@ -153,7 +173,7 @@ static int pingu_conf_read_host(FILE *f, char *hoststr, int *lineno)
 			host->burst_interval = atof(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
-				  lineno);
+				  conf->lineno);
 		}
 	}
 	if (host->iface == NULL)
@@ -161,28 +181,22 @@ static int pingu_conf_read_host(FILE *f, char *hoststr, int *lineno)
 	return 0;
 }
 
-int pingu_conf_read(const char *filename)
+int pingu_conf_parse(const char *filename)
 {
-	int lineno = 0;
-	char line[256];
 	int r = 0;
-	FILE *f = pingu_conf_open(filename);
+	char *key, *value;
+	struct pingu_conf *conf = pingu_conf_open(filename);
 
-	if (f == NULL)
+	if (conf == NULL)
 		return -1;
 
-	while (fgets(line, sizeof(line), f)) {
-		char *key, *value;
-		lineno++;
-		parse_line(line, &key, &value);
-		if (key == NULL)
-			continue;
+	while (pingu_conf_read_key_value(conf, &key, &value)) {
 		if (strcmp(key, "interface") == 0) {
-			r = pingu_conf_read_iface(f, chomp_bracket(value), &lineno);
+			r = pingu_conf_read_iface(conf, chomp_bracket(value));
 			if (r < 0)
 				break;
 		} else if (strcmp(key, "host") == 0) {
-			r = pingu_conf_read_host(f, chomp_bracket(value), &lineno);
+			r = pingu_conf_read_host(conf, chomp_bracket(value));
 			if (r < 0)
 				break;
 		} else if (strcmp(key, "interval") == 0) {
@@ -199,10 +213,11 @@ int pingu_conf_read(const char *filename)
 			default_down_action = xstrdup(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
-				  lineno);
+				  conf->lineno);
 			r = -1;
 			break;
 		}
 	}
+	pingu_conf_close(conf);
 	return r;
 }
