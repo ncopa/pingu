@@ -24,7 +24,7 @@ static void parse_line(char *line, char **key, char **value)
 	(*value) = NULL;
 	(*key) = NULL;
 
-	/* strip comments and trailng \n */
+	/* strip comments and trailing \n */
 	p = strpbrk(line, "#\n");
 	if (p)
 		*p = '\0';
@@ -34,7 +34,7 @@ static void parse_line(char *line, char **key, char **value)
 		line++;
 	if (*line == '\0')
 		return;
-		
+
 	(*key) = line;
 
 	/* find space between keyword and value */
@@ -87,14 +87,14 @@ static char *pingu_conf_get_key_value(FILE *f, char **key, char **value, int *li
 	*value = v;
 	return line;
 }
-	
-		
+
+
 
 static int pingu_conf_read_iface(FILE *f, char *ifname, int *lineno)
 {
 	struct pingu_iface *iface;
 	char *key, *value;
-	
+
 	iface = pingu_iface_get_by_name(value);
 	if (iface != NULL) {
 		log_error("Interface %s already declared");
@@ -112,7 +112,7 @@ static int pingu_conf_read_iface(FILE *f, char *ifname, int *lineno)
 			pingu_iface_set_route_table(iface, atoi(value));
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
-				  lineno);
+				  *lineno);
 		}
 	}
 	return 0;
@@ -122,7 +122,7 @@ static int pingu_conf_read_host(FILE *f, char *hoststr, int *lineno)
 {
 	char *key, *value;
 	struct pingu_host *host;
-	
+
 	host = pingu_host_new(xstrdup(hoststr), default_burst_interval,
 			      default_max_retries, default_required_replies,
 			      default_timeout, default_up_action,
@@ -134,7 +134,7 @@ static int pingu_conf_read_host(FILE *f, char *hoststr, int *lineno)
 			host->iface = pingu_iface_get_by_name_or_new(value);
 			if (host->iface == NULL) {
 				log_error("Undefined interface %s on line %i",
-					   value, lineno);
+					   value, *lineno);
 				return -1;
 			}
 		} else if (strcmp(key, "label") == 0) {
@@ -167,7 +167,7 @@ int pingu_conf_read(const char *filename)
 	char line[256];
 	int r = 0;
 	FILE *f = pingu_conf_open(filename);
-	
+
 	if (f == NULL)
 		return -1;
 
