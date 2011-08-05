@@ -4,24 +4,11 @@
 #include <netinet/in.h>
 #include <ev.h>
 
+#include "pingu_gateway.h"
 #include "sockaddr_util.h"
 #include "list.h"
 
 #define PINGU_ROUTE_TABLE_AUTO -1
-
-struct pingu_gateway {
-	union sockaddr_any gw_addr;
-	union sockaddr_any dest;
-	union sockaddr_any src;
-	unsigned char dst_len;
-	unsigned char src_len;
-	
-	int metric;
-	unsigned char protocol;
-	unsigned char scope;
-	unsigned char type;	
-	struct list_head gateway_list_entry;
-};
 
 struct pingu_iface {
 	char name[32];
