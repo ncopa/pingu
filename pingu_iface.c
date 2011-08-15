@@ -154,6 +154,7 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 		log_debug("%s: removed default gateway", iface->name);
 		break;
 	}
+	kernel_route_multipath(action, &iface_list, RT_TABLE_MAIN);
 }
 
 void pingu_iface_update_routes(struct pingu_iface *iface, int action)
@@ -162,6 +163,7 @@ void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 	list_for_each_entry(route, &iface->gateway_list, gateway_list_entry) {
 		kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
 	}
+	kernel_route_multipath(action, &iface_list, &iface->default_gw, RT_TABLE_MAIN);
 }
 
 int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
