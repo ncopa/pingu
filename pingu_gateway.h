@@ -10,11 +10,11 @@ struct pingu_gateway {
 	union sockaddr_any src;
 	unsigned char dst_len;
 	unsigned char src_len;
-	
+
 	int metric;
 	unsigned char protocol;
 	unsigned char scope;
-	unsigned char type;	
+	unsigned char type;
 	struct list_head gateway_list_entry;
 };
 
@@ -23,7 +23,8 @@ void pingu_gateway_add(struct list_head *gateway_list,
 			     struct pingu_gateway *gw);
 void pingu_gateway_del(struct list_head *gateway_list,
 			     struct pingu_gateway *gw);
-			     
+int is_default_gw(struct pingu_gateway *route);
+
 
 
 #endif

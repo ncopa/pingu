@@ -455,20 +455,6 @@ static void log_route_change(struct pingu_gateway *route,
 		  deststr, route->dst_len, gwstr, ifname, table);	
 }
 
-static int is_default_gw(struct pingu_gateway *route)
-{
-	switch (route->dest.sa.sa_family) {
-	case AF_INET:
-		return ((route->dest.sin.sin_addr.s_addr == 0) 
-			 && (route->gw_addr.sin.sin_addr.s_addr != 0));
-		break;
-	case AF_INET6:
-		log_debug("TODO: ipv6");
-		break;
-	}
-	return FALSE;
-}
-		
 static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 {
 	struct pingu_iface *iface;

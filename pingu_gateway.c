@@ -102,3 +102,18 @@ void pingu_gateway_del(struct list_head *gateway_list,
 	list_del(&gw->gateway_list_entry);
 	free(gw);
 }
+
+int is_default_gw(struct pingu_gateway *route)
+{
+	switch (route->dest.sa.sa_family) {
+	case AF_INET:
+		return ((route->dest.sin.sin_addr.s_addr == 0) 
+			 && (route->gw_addr.sin.sin_addr.s_addr != 0));
+		break;
+	case AF_INET6:
+		log_debug("TODO: ipv6");
+		break;
+	}
+	return 0;
+}
+		
