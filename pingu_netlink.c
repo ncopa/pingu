@@ -118,6 +118,17 @@ static int netlink_add_rtattr_addr_any(struct nlmsghdr *n, int maxlen,
 	return FALSE;
 }
 
+static int netlink_log_error(struct nlmsghdr *hdr)
+{
+	struct nlmsgerr *nlerr = (struct nlmsgerr*)NLMSG_DATA(hdr);
+	if (hdr->nlmsg_len < NLMSG_LENGTH(sizeof(struct nlmsgerr))) {
+		log_error("Netlink error message truncated");
+	} else {
+		log_error("Netlink error: %s", strerror(-nlerr->error));
+	}
+	return FALSE;
+}
+
 static int netlink_receive(struct netlink_fd *fd, struct nlmsghdr *reply)
 {
 	struct sockaddr_nl nladdr;
@@ -166,6 +177,8 @@ static int netlink_receive(struct netlink_fd *fd, struct nlmsghdr *reply)
 			} else if (h->nlmsg_type <= fd->dispatch_size &&
 				fd->dispatch[h->nlmsg_type] != NULL) {
 				fd->dispatch[h->nlmsg_type](h);
+			} else if (h->nlmsg_type == NLMSG_ERROR) {
+				return netlink_log_error(h);
 			} else if (h->nlmsg_type != NLMSG_DONE) {
 				log_info("Unknown NLmsg: 0x%08x, len %d",
 					  h->nlmsg_type, h->nlmsg_len);
