@@ -15,6 +15,8 @@ struct pingu_iface {
 	int index;
 	int has_binding;
 	int has_link;
+	int balance;
+	int balance_weight;
 	int fd;
 	union sockaddr_any primary_addr;
 	int route_table;

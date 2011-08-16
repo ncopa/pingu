@@ -294,6 +294,8 @@ static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
 	netlink_add_subrtattr_addr_any(rta, 1024, RTA_GATEWAY,
 					&route->gw_addr);
 	rtnh->rtnh_len += sizeof(struct rtattr) + 4; // TODO: support ipv6
+	if (iface->balance_weight)
+		rtnh->rtnh_hops = iface->balance_weight - 1;
 	rtnh->rtnh_ifindex = iface->index;
 	return 1;
 }
@@ -313,7 +315,7 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 	rtnh = RTA_DATA(rta);
 
 	list_for_each_entry(iface, iface_list, iface_list_entry) {
-		if (iface->index == 0 || list_empty(&iface->gateway_list))
+		if ((!iface->balance) || iface->index == 0 || list_empty(&iface->gateway_list))
 			continue;
 		memset(rtnh, 0, sizeof(*rtnh));
 		rtnh->rtnh_len = sizeof(*rtnh);
@@ -337,6 +339,7 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 	} req;
 	struct sockaddr_nl addr;
 	union sockaddr_any dest;
+	int count = 0;
 
 	memset(&req, 0, sizeof(req));
 	memset(&addr, 0, sizeof(addr));
@@ -355,16 +358,21 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 	req.msg.rtm_family = AF_INET;
 	req.msg.rtm_table = table;
 	req.msg.rtm_dst_len = 0;
-	req.msg.rtm_protocol = RTPROT_UNSPEC;
+	req.msg.rtm_protocol = RTPROT_BOOT;
 	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
 	req.msg.rtm_type = RTN_UNICAST;
 
 	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), RTA_DST,
 					&dest);
 
-	add_nexthops(&req.nlh, sizeof(req), iface_list);
-	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
+	count = add_nexthops(&req.nlh, sizeof(req), iface_list);
+	if (count > 1) {
+		return sendto(fd->fd, (void *) &req, sizeof(req), 0,
 		      (struct sockaddr *) &addr, sizeof(addr));
+	}
+	if (count == 1)
+		log_debug("Not load-balancing a single gateway");
+	return 0;
 }
 
 int netlink_route_replace_or_add(struct netlink_fd *fd,
