@@ -366,12 +366,10 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 					&dest);
 
 	count = add_nexthops(&req.nlh, sizeof(req), iface_list);
-	if (count > 1) {
+	if (count > 0) {
 		return sendto(fd->fd, (void *) &req, sizeof(req), 0,
 		      (struct sockaddr *) &addr, sizeof(addr));
 	}
-	if (count == 1)
-		log_debug("Not load-balancing a single gateway");
 	return 0;
 }
 
