@@ -40,6 +40,11 @@ int pingu_iface_bind_socket(struct pingu_iface *iface, int log_error)
 	int r;
 	if (iface->name[0] == '\0')
 		return 0;
+	r = setsockopt(iface->fd, SOL_SOCKET, SO_BINDTODEVICE, iface->name,
+		       strlen(iface->name));
+	if (r < 0 && log_error)
+		log_perror(iface->name);
+
 	r = bind(iface->fd, &iface->primary_addr.sa,
 		 sockaddr_len(&iface->primary_addr));
 	if (r < 0 && log_error)
