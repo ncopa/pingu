@@ -563,15 +563,17 @@ static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
 static void log_route_change(struct pingu_gateway *route,
 			     char *ifname, int table, int action)
 {
-	char deststr[64], gwstr[64];
+	char deststr[64] = "", gwstr[64] = "", viastr[68] = "";
 	char *actionstr = "New";
 	if (action == RTM_DELROUTE)
 		actionstr = "Delete";
 
 	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
 	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
-	log_debug("%s route to %s/%i via %s dev %s table %i", actionstr,
-		  deststr, route->dst_len, gwstr, ifname, table);
+	if (gwstr[0] != '\0')
+		snprintf(viastr, sizeof(viastr), "via %s ", gwstr);
+	log_debug("%s route to %s/%i %sdev %s table %i", actionstr,
+		  deststr, route->dst_len, viastr, ifname, table);
 }
 
 static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
