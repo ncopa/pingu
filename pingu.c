@@ -110,12 +110,18 @@ static int daemonize(void)
 	return 0;
 }
 
+static void sigint_cb(struct ev_loop *loop, ev_signal *w, int revents)
+{
+	ev_break(loop, EVBREAK_ALL);
+}
+
 int main(int argc, char *argv[])
 {
 	int c;
 	const char *config_file = DEFAULT_CONFIG;
 	int verbose = 0;
 	static struct ev_loop *loop;
+	static struct ev_signal signal_watcher;
 
 	while ((c = getopt(argc, argv, "c:dhp:Vv")) != -1) {
 		switch (c) {
@@ -161,6 +167,10 @@ int main(int argc, char *argv[])
 			return 1;
 	}
 
+	ev_signal_init(&signal_watcher, sigint_cb, SIGINT);
+	ev_signal_start(loop, &signal_watcher);
+
 	ev_run(loop, 0);
 	return 0;
 }
+
