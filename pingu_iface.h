@@ -13,8 +13,9 @@
 struct pingu_iface {
 	char name[32];
 	int index;
-	int has_binding;
 	int has_link;
+	int has_address;
+	int has_binding;
 	int balance;
 	int balance_weight;
 	int fd;

@@ -466,7 +466,6 @@ static void netlink_link_new_cb(struct nlmsghdr *msg)
 
 	iface->index = ifi->ifi_index;
 	iface->has_link = 1;
-	pingu_iface_bind_socket(iface, 1);
 }
 
 static void netlink_link_del_cb(struct nlmsghdr *msg)
@@ -510,6 +509,7 @@ static void netlink_addr_new_cb(struct nlmsghdr *msg)
 	pingu_iface_set_addr(iface, ifa->ifa_family,
 			     RTA_DATA(rta[IFA_LOCAL]),
 			     RTA_PAYLOAD(rta[IFA_LOCAL]));
+	pingu_iface_bind_socket(iface, 1);
 	netlink_rule_replace_or_add(&talk_fd, iface);
 }
 

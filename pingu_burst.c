@@ -19,13 +19,6 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 	int r;
 	char buf[64];
 
-	/* we bind to device every burst in case an iface disappears and
-	   comes back. e.g ppp0 */
-	if (pingu_iface_bind_socket(host->iface, host->status) < 0) {
-		pingu_host_set_status(host, 0);
-		return;
-	}
-	
 	host->burst.active = 1;
 	host->burst.pings_sent = 0;
 	host->burst.pings_replied = 0;

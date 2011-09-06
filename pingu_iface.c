@@ -67,7 +67,7 @@ int pingu_iface_usable(struct pingu_iface *iface)
 {
 	if (iface->name[0] == '\0')
 		return 1;
-	return iface->has_link && iface->has_binding;
+	return iface->has_link && iface->has_address && iface->has_binding;
 }
 
 struct pingu_iface *pingu_iface_get_by_name(const char *name)
@@ -120,10 +120,13 @@ void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 {
 	sockaddr_init(&iface->primary_addr, family, data);
 	if (len <= 0 || data == NULL) {
+		iface->has_address = 0;
+		iface->has_binding = 0;
 		pingu_gateway_del_all(&iface->gateway_list);
 		log_debug("%s: address removed", iface->name);
 		return;
 	}
+	iface->has_address = 1;
 	log_debug("%s: new address: %s", iface->name,
 		inet_ntoa(iface->primary_addr.sin.sin_addr));
 }
