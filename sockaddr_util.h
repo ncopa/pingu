@@ -22,5 +22,6 @@ union sockaddr_any *sockaddr_from_addrinfo(union sockaddr_any *sa,
 					  struct addrinfo *ai);
 
 char *sockaddr_to_string(union sockaddr_any *sa, char *str, size_t size);
+socklen_t sockaddr_len(union sockaddr_any *sa);
 
 #endif /* SOCKADDR_UTIL_H */

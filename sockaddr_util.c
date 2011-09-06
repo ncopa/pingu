@@ -86,3 +86,17 @@ char *sockaddr_to_string(union sockaddr_any *sa, char *str, size_t size)
 	}
 	return str;
 }
+
+socklen_t sockaddr_len(union sockaddr_any *sa)
+{
+	socklen_t len = 0;
+	switch (sa->sa.sa_family) {
+	case AF_INET:
+		len = sizeof(sa->sin);
+		break;
+	case AF_INET6:
+		len = sizeof(sa->sin6);
+		break;
+	}
+	return len;
+}
