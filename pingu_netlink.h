@@ -8,5 +8,7 @@ int kernel_init(struct ev_loop *loop);
 int kernel_route_modify(int action, struct pingu_gateway *route,
 			struct pingu_iface *iface, int table);
 int kernel_route_multipath(int action, struct list_head *iface_list, int table);
+void kernel_cleanup_iface(struct pingu_iface *iface);
+void kernel_close(void);
 
 #endif

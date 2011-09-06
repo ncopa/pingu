@@ -637,7 +637,8 @@ static void netlink_read_cb(struct ev_loop *loop, struct ev_io *w, int revents)
 static void netlink_close(struct ev_loop *loop, struct netlink_fd *fd)
 {
 	if (fd->fd >= 0) {
-		ev_io_stop(loop, &fd->io);
+		if (loop != NULL)
+			ev_io_stop(loop, &fd->io);
 		close(fd->fd);
 		fd->fd = 0;
 	}
@@ -735,5 +736,17 @@ err_close_all:
 		netlink_close(loop, &netlink_fds[i]);
 
 	return FALSE;
+}
+
+void kernel_cleanup_iface(struct pingu_iface *iface)
+{
+	netlink_rule_del(&talk_fd, iface);
+}
+
+void kernel_close(void)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(netlink_groups); i++)
+		netlink_close(NULL, &netlink_fds[i]);
 }
 

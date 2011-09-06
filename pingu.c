@@ -171,6 +171,9 @@ int main(int argc, char *argv[])
 	ev_signal_start(loop, &signal_watcher);
 
 	ev_run(loop, 0);
+
+	pingu_iface_cleanup();
+	kernel_close();
 	return 0;
 }
 

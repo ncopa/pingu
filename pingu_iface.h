@@ -41,5 +41,6 @@ int pingu_iface_set_route_table(struct pingu_iface *iface, int table);
 void pingu_iface_gw_action(struct pingu_iface *iface,
 			   struct pingu_gateway *gw, int action);
 void pingu_iface_update_routes(struct pingu_iface *iface, int action);
+void pingu_iface_cleanup(void);
 
 #endif

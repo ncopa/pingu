@@ -202,3 +202,12 @@ int pingu_iface_init(struct ev_loop *loop)
 	}
 	return 0;
 }
+
+void pingu_iface_cleanup(void)
+{
+	struct pingu_iface *iface;
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		kernel_cleanup_iface(iface);
+		close(iface->fd);
+	}
+}
