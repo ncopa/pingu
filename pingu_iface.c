@@ -196,6 +196,17 @@ int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
 	return table;
 }
 
+static int pingu_iface_count_balanced(void)
+{
+	struct pingu_iface *iface;
+	int count = 0;
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (iface->balance && (iface->index != 0) && !list_empty(&iface->gateway_list))
+			count++;
+	}
+	return count;
+}
+
 int pingu_iface_init(struct ev_loop *loop)
 {
 	struct pingu_iface *iface;
@@ -211,9 +222,15 @@ int pingu_iface_init(struct ev_loop *loop)
 void pingu_iface_cleanup(void)
 {
 	struct pingu_iface *iface;
+	/* remove loadbalance route */
+	if (pingu_iface_count_balanced() > 1) {
+		int err = kernel_route_multipath(RTM_DELROUTE, &iface_list, RT_TABLE_MAIN);
+		if (err > 0)
+			log_error("Failed to delete load-balance route: %s", strerror(err));
+	}
+
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
-		if (iface->has_route_rule)
-			kernel_cleanup_iface_routes(iface);
+		kernel_cleanup_iface_routes(iface);
 		close(iface->fd);
 	}
 }
