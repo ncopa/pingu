@@ -550,6 +550,8 @@ static void netlink_addr_new_cb(struct nlmsghdr *msg)
 			     RTA_PAYLOAD(rta[IFA_LOCAL]));
 	pingu_iface_bind_socket(iface, 1);
 	err = netlink_rule_replace_or_add(&talk_fd, iface);
+	if (err == 0)
+		iface->has_route_rule = 1;
 	if (err > 0)
 		log_error("%s: Failed to add route rule: %s", iface->name,
 			  strerror(err));
@@ -784,9 +786,16 @@ err_close_all:
 	return FALSE;
 }
 
-void kernel_cleanup_iface(struct pingu_iface *iface)
+void kernel_cleanup_iface_routes(struct pingu_iface *iface)
 {
-	netlink_rule_del(&talk_fd, iface);
+	int err = 0;
+	if (iface->has_route_rule) {
+		err = netlink_rule_del(&talk_fd, iface);
+		if (err == 0)
+			iface->has_route_rule = 0;
+		if (err > 0)
+			log_error("Failed to delete route rule for %s", iface->name);
+	}
 }
 
 void kernel_close(void)

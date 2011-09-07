@@ -212,7 +212,8 @@ void pingu_iface_cleanup(void)
 {
 	struct pingu_iface *iface;
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
-		kernel_cleanup_iface(iface);
+		if (iface->has_route_rule)
+			kernel_cleanup_iface_routes(iface);
 		close(iface->fd);
 	}
 }
