@@ -149,15 +149,24 @@ static int netlink_add_subrtattr_addr_any(struct rtattr *rta, int maxlen,
 	return FALSE;
 }
 
-static int netlink_log_error(struct nlmsghdr *hdr)
+static int netlink_get_error(struct nlmsghdr *hdr)
 {
 	struct nlmsgerr *nlerr = (struct nlmsgerr*)NLMSG_DATA(hdr);
+	if (hdr->nlmsg_type != NLMSG_ERROR)
+		return 0;
 	if (hdr->nlmsg_len < NLMSG_LENGTH(sizeof(struct nlmsgerr))) {
 		log_error("Netlink error message truncated");
-	} else {
-		log_error("Netlink error: %s", strerror(-nlerr->error));
+		return -1;
 	}
-	return FALSE;
+	return -nlerr->error;
+}
+
+static int netlink_log_error(struct nlmsghdr *hdr)
+{
+	int err = netlink_get_error(hdr);
+	if (err > 0)
+		log_error("Netlink error: %s", strerror(err));
+	return err;
 }
 
 static int netlink_receive(struct netlink_fd *fd, struct nlmsghdr *reply)
@@ -221,6 +230,50 @@ static int netlink_receive(struct netlink_fd *fd, struct nlmsghdr *reply)
 	return TRUE;
 }
 
+static int netlink_send(struct netlink_fd *fd, struct nlmsghdr *req)
+{
+        struct sockaddr_nl nladdr;
+        struct iovec iov = {
+                .iov_base = (void*) req,
+                .iov_len = req->nlmsg_len
+        };
+        struct msghdr msg = {
+                .msg_name = &nladdr,
+                .msg_namelen = sizeof(nladdr),
+                .msg_iov = &iov,
+                .msg_iovlen = 1,
+        };
+        int status;
+
+        memset(&nladdr, 0, sizeof(nladdr));
+        nladdr.nl_family = AF_NETLINK;
+
+        req->nlmsg_seq = ++fd->seq;
+
+        status = sendmsg(fd->fd, &msg, 0);
+        if (status < 0) {
+                log_perror("Cannot talk to rtnetlink");
+                return FALSE;
+        }
+        return TRUE;
+}
+
+static int netlink_talk(struct netlink_fd *fd, struct nlmsghdr *req,
+		 size_t replysize, struct nlmsghdr *reply)
+{
+	if (reply == NULL)
+		req->nlmsg_flags |= NLM_F_ACK;
+
+	if (!netlink_send(fd, req))
+		return FALSE;
+
+	if (reply == NULL)
+		return TRUE;
+
+	reply->nlmsg_len = replysize;
+	return netlink_receive(fd, reply);
+}
+
 static int netlink_enumerate(struct netlink_fd *fd, int family, int type)
 {
 	struct {
@@ -253,14 +306,9 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 		struct rtmsg	msg;
 		char buf[1024];
 	} req;
-	struct sockaddr_nl addr;
-
-	memset(&req, 0, sizeof(req));
-	memset(&addr, 0, sizeof(addr));
-	addr.nl_family = AF_NETLINK;
 
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	req.nlh.nlmsg_flags = NLM_F_REQUEST;
+	req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
 	req.nlh.nlmsg_type = action_type;
 	if (action_type == RTM_NEWROUTE)
 		req.nlh.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
@@ -281,8 +329,9 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 		netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_PRIORITY,
 				     &route->metric, 4);
 
-	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
-		      (struct sockaddr *) &addr, sizeof(addr));
+	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
+		return FALSE;
+	return netlink_get_error(&req.nlh);
 }
 
 static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
@@ -337,20 +386,15 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 		struct rtmsg	msg;
 		char buf[1024];
 	} req;
-	struct sockaddr_nl addr;
 	union sockaddr_any dest;
 	int count = 0;
 
 	memset(&req, 0, sizeof(req));
-	memset(&addr, 0, sizeof(addr));
 	memset(&dest, 0, sizeof(dest));
-
 	dest.sa.sa_family = AF_INET;
 
-	addr.nl_family = AF_NETLINK;
-
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	req.nlh.nlmsg_flags = NLM_F_REQUEST;
+	req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
 	req.nlh.nlmsg_type = action_type;
 	if (action_type == RTM_NEWROUTE)
 		req.nlh.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
@@ -366,11 +410,12 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 					&dest);
 
 	count = add_nexthops(&req.nlh, sizeof(req), iface_list);
-	if (count > 0) {
-		return sendto(fd->fd, (void *) &req, sizeof(req), 0,
-		      (struct sockaddr *) &addr, sizeof(addr));
-	}
-	return 0;
+	if (count == 0)
+		return 0;
+	
+	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
+		return -1;
+	return netlink_get_error(&req.nlh);
 }
 
 int netlink_route_replace_or_add(struct netlink_fd *fd,
@@ -395,17 +440,12 @@ int netlink_rule_modify(struct netlink_fd *fd,
 		struct rtmsg	msg;
 		char buf[1024];
 	} req;
-	struct sockaddr_nl addr;
-//	uint32_t preference = 1000;
-//	in_addr_t destination = 0;
 	char buf[64];
 
 	memset(&req, 0, sizeof(req));
-	memset(&addr, 0, sizeof(addr));
-	addr.nl_family = AF_NETLINK;
 
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	req.nlh.nlmsg_flags = NLM_F_REQUEST;
+	req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
 	req.nlh.nlmsg_type = type;
 	if (type == RTM_NEWRULE)
 		req.nlh.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
@@ -416,17 +456,15 @@ int netlink_rule_modify(struct netlink_fd *fd,
 	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
 	req.msg.rtm_type = RTN_UNICAST;
 
-//	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_PRIORITY, &preference, 4);
-
 	req.msg.rtm_src_len = 32;
 	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), FRA_SRC,
 				    &iface->primary_addr);
 	sockaddr_to_string(&iface->primary_addr, buf, sizeof(buf));
-//	netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_OIFNAME, iface->name, strlen(iface->name)+1);
 
-	return sendto(fd->fd, (void *) &req, sizeof(req), 0,
-		      (struct sockaddr *) &addr, sizeof(addr));
+	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
+		return -1;
 
+	return netlink_get_error(&req.nlh);
 }
 
 int netlink_rule_del(struct netlink_fd *fd,	struct pingu_iface *iface)
@@ -494,6 +532,7 @@ static void netlink_addr_new_cb(struct nlmsghdr *msg)
 	struct pingu_iface *iface;
 	struct ifaddrmsg *ifa = NLMSG_DATA(msg);
 	struct rtattr *rta[IFA_MAX+1];
+	int err;
 
 	if (ifa->ifa_flags & IFA_F_SECONDARY)
 		return;
@@ -510,7 +549,10 @@ static void netlink_addr_new_cb(struct nlmsghdr *msg)
 			     RTA_DATA(rta[IFA_LOCAL]),
 			     RTA_PAYLOAD(rta[IFA_LOCAL]));
 	pingu_iface_bind_socket(iface, 1);
-	netlink_rule_replace_or_add(&talk_fd, iface);
+	err = netlink_rule_replace_or_add(&talk_fd, iface);
+	if (err > 0)
+		log_error("%s: Failed to add route rule: %s", iface->name,
+			  strerror(err));
 }
 
 static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
@@ -583,6 +625,7 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	struct rtattr *rta[RTA_MAX+1];
 
 	struct pingu_gateway route;
+	int err;
 
 	/* ignore route changes that we made ourselves via talk_fd */
 	if (msg->nlmsg_pid == getpid())
@@ -599,8 +642,11 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 		return;
 
 	log_route_change(&route, iface->name, iface->route_table, action);
-	netlink_route_modify(&talk_fd, action, &route,
-			     iface->index, iface->route_table);
+	err = netlink_route_modify(&talk_fd, action, &route,
+				   iface->index, iface->route_table);
+	if (err > 0)
+		log_error("Failed to %s route to table %i",
+			  action == RTM_NEWROUTE ? "add" : "delete", iface->route_table);
 
 	if (is_default_gw(&route))
 		pingu_iface_gw_action(iface, &route, action);
