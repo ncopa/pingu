@@ -432,6 +432,31 @@ int netlink_route_delete(struct netlink_fd *fd,
 	return netlink_route_modify(fd, RTM_DELROUTE, route, iface_index, table);
 }
 
+static void netlink_route_flush(struct netlink_fd *fd, int table)
+{
+	struct {
+		struct nlmsghdr	nlh;
+		struct rtmsg	msg;
+		char buf[1024];
+	} req;
+	int err = 0;
+
+	while (err == 0) {
+		req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+		req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+		req.nlh.nlmsg_type = RTM_DELROUTE;
+		req.msg.rtm_family = AF_INET; /* TODO: ipv6 */
+		req.msg.rtm_table = table;
+		req.msg.rtm_protocol = RTPROT_UNSPEC;
+		req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
+		req.msg.rtm_type = RTN_UNSPEC;
+		
+		if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
+			break;
+		err = netlink_get_error(&req.nlh);
+	}
+}
+
 int netlink_rule_modify(struct netlink_fd *fd,
 	struct pingu_iface *iface, int type)
 {
@@ -795,6 +820,7 @@ void kernel_cleanup_iface_routes(struct pingu_iface *iface)
 			iface->has_route_rule = 0;
 		if (err > 0)
 			log_error("Failed to delete route rule for %s", iface->name);
+		netlink_route_flush(&talk_fd, iface->route_table);		
 	}
 }
 
