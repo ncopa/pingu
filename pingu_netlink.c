@@ -588,8 +588,8 @@ static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
 	if (iface == NULL)
 		return;
 
-	pingu_iface_set_addr(iface, 0, NULL, 0);
 	netlink_rule_del(&talk_fd, iface);
+	pingu_iface_set_addr(iface, 0, NULL, 0);
 }
 
 static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
