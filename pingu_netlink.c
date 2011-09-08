@@ -306,7 +306,7 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 		struct rtmsg	msg;
 		char buf[1024];
 	} req;
-	
+
 	memset(&req, 0, sizeof(req));
 
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -414,7 +414,7 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 	count = add_nexthops(&req.nlh, sizeof(req), iface_list);
 	if (count == 0)
 		return 0;
-	
+
 	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
 		return -1;
 	return netlink_get_error(&req.nlh);
@@ -499,9 +499,6 @@ static void netlink_link_new_cb(struct nlmsghdr *msg)
 	struct rtattr *rta[IFLA_MAX+1];
 	const char *ifname;
 
-	if (!(ifi->ifi_flags & IFF_LOWER_UP))
-		return;
-
 	netlink_parse_rtattr(rta, IFLA_MAX, IFLA_RTA(ifi), IFLA_PAYLOAD(msg));
 	if (rta[IFLA_IFNAME] == NULL)
 		return;
@@ -511,13 +508,14 @@ static void netlink_link_new_cb(struct nlmsghdr *msg)
 	if (iface == NULL)
 		return;
 
-	if (iface->index == 0 || (ifi->ifi_flags & ifi->ifi_change & IFF_UP)) {
-		log_info("Interface %s: got link",
-			  ifname);
-	}
+	if (iface->index == 0 && ifi->ifi_index != 0)
+		log_info("New interface: %s", ifname);
 
 	iface->index = ifi->ifi_index;
-	iface->has_link = 1;
+	if (ifi->ifi_flags & IFF_LOWER_UP) {
+		log_info("%s: got link", ifname);
+		iface->has_link = 1;
+	}
 }
 
 static void netlink_link_del_cb(struct nlmsghdr *msg)
@@ -807,7 +805,7 @@ void kernel_cleanup_iface_routes(struct pingu_iface *iface)
 			iface->has_route_rule = 0;
 		if (err > 0)
 			log_error("Failed to delete route rule for %s", iface->name);
-		netlink_route_flush(&talk_fd, iface);		
+		netlink_route_flush(&talk_fd, iface);
 	}
 }
 
