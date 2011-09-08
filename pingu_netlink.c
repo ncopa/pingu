@@ -306,6 +306,8 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 		struct rtmsg	msg;
 		char buf[1024];
 	} req;
+	
+	memset(&req, 0, sizeof(req));
 
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
@@ -337,9 +339,9 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
 			 struct pingu_iface *iface)
 {
-	struct pingu_gateway *route = container_of(iface->gateway_list.next,
-						   struct pingu_gateway,
-						   gateway_list_entry);
+	struct pingu_gateway *route = pingu_gateway_first_default(&iface->gateway_list);
+	if (route == NULL)
+		return 0;
 	netlink_add_subrtattr_addr_any(rta, 1024, RTA_GATEWAY,
 					&route->gw_addr);
 	rtnh->rtnh_len += sizeof(struct rtattr) + 4; // TODO: support ipv6
@@ -432,28 +434,15 @@ int netlink_route_delete(struct netlink_fd *fd,
 	return netlink_route_modify(fd, RTM_DELROUTE, route, iface_index, table);
 }
 
-static void netlink_route_flush(struct netlink_fd *fd, int table)
+static void netlink_route_flush(struct netlink_fd *fd, struct pingu_iface *iface)
 {
-	struct {
-		struct nlmsghdr	nlh;
-		struct rtmsg	msg;
-		char buf[1024];
-	} req;
-	int err = 0;
-
-	while (err == 0) {
-		req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-		req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-		req.nlh.nlmsg_type = RTM_DELROUTE;
-		req.msg.rtm_family = AF_INET; /* TODO: ipv6 */
-		req.msg.rtm_table = table;
-		req.msg.rtm_protocol = RTPROT_UNSPEC;
-		req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
-		req.msg.rtm_type = RTN_UNSPEC;
-		
-		if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
-			break;
-		err = netlink_get_error(&req.nlh);
+	struct pingu_gateway *gw;
+	int err;
+	list_for_each_entry(gw, &iface->gateway_list, gateway_list_entry) {
+		err = netlink_route_delete(fd, gw, iface->index, iface->route_table);
+		if (err > 0)
+			log_error("%s: Failed to clean up route in table %i: ",
+				  iface->name, iface->route_table, strerror(err));
 	}
 }
 
@@ -674,9 +663,7 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	if (err > 0)
 		log_error("Failed to %s route to table %i",
 			  action == RTM_NEWROUTE ? "add" : "delete", iface->route_table);
-
-	if (is_default_gw(&route))
-		pingu_iface_gw_action(iface, &route, action);
+	pingu_iface_gw_action(iface, &route, action);
 }
 
 static void netlink_route_new_cb(struct nlmsghdr *msg)
@@ -820,7 +807,7 @@ void kernel_cleanup_iface_routes(struct pingu_iface *iface)
 			iface->has_route_rule = 0;
 		if (err > 0)
 			log_error("Failed to delete route rule for %s", iface->name);
-		netlink_route_flush(&talk_fd, iface->route_table);		
+		netlink_route_flush(&talk_fd, iface);		
 	}
 }
 
