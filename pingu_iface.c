@@ -155,14 +155,15 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 	switch (action) {
 	case RTM_NEWROUTE:
 		pingu_gateway_add(&iface->gateway_list, gw);
-		log_debug("%s: added default gateway", iface->name);
+		log_debug("%s: added route", iface->name);
 		break;
 	case RTM_DELROUTE:
 		pingu_gateway_del(&iface->gateway_list, gw);
-		log_debug("%s: removed default gateway", iface->name);
+		log_debug("%s: removed route", iface->name);
 		break;
 	}
-	kernel_route_multipath(action, &iface_list, RT_TABLE_MAIN);
+	if (is_default_gw(gw))
+		kernel_route_multipath(action, &iface_list, RT_TABLE_MAIN);
 }
 
 void pingu_iface_update_routes(struct pingu_iface *iface, int action)
