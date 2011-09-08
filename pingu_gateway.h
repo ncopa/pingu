@@ -24,7 +24,7 @@ void pingu_gateway_add(struct list_head *gateway_list,
 void pingu_gateway_del(struct list_head *gateway_list,
 			     struct pingu_gateway *gw);
 int is_default_gw(struct pingu_gateway *route);
-
+struct pingu_gateway *pingu_gateway_first_default(struct list_head *gateway_list);
 
 
 #endif

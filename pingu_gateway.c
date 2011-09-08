@@ -117,3 +117,12 @@ int is_default_gw(struct pingu_gateway *route)
 	return 0;
 }
 		
+struct pingu_gateway *pingu_gateway_first_default(struct list_head *gateway_list)
+{
+	struct pingu_gateway *entry;
+	list_for_each_entry(entry, gateway_list, gateway_list_entry) {
+		if (is_default_gw(entry))
+			return entry;
+	}
+	return NULL;
+}
