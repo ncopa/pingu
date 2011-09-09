@@ -35,6 +35,7 @@
 
 #include "log.h"
 #include "pingu_iface.h"
+#include "pingu_host.h"
 #include "pingu_netlink.h"
 
 #ifndef ARRAY_SIZE
@@ -359,6 +360,7 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 	struct rtnexthop *rtnh;
 	struct pingu_iface *iface;
 	struct pingu_gateway *route;
+	struct pingu_host *host;
 	int count = 0;
 
 	memset(buf, 0, sizeof(buf));
@@ -370,8 +372,9 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 		route = pingu_gateway_first_default(&iface->gateway_list);
 		switch (action_type) {
 		case RTM_NEWROUTE:
+			host = pingu_host_find_by_iface(iface);
 			if ((!iface->balance) || iface->index == 0
-			    || route == NULL)
+			    || (host != NULL && !host->status) || route == NULL)
 				continue;
 			iface->has_multipath = 1;
 			break;

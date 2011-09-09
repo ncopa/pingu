@@ -102,6 +102,15 @@ struct pingu_host *pingu_host_new(char *hoststr, float burst_interval,
 	return host;
 }
 
+struct pingu_host *pingu_host_find_by_iface(struct pingu_iface *iface)
+{
+	struct pingu_host *host;
+	list_for_each_entry(host, &host_list, host_list_entry)
+		if (host->iface == iface)
+			return host;
+	return NULL;
+}
+
 int pingu_host_init(struct ev_loop *loop)
 {
 	struct pingu_host *host;
