@@ -375,8 +375,10 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 			host = pingu_host_find_by_iface(iface);
 			if ((!iface->balance) || iface->index == 0
 			    || (host != NULL && host->status == PINGU_HOST_STATUS_OFFLINE)
-			    || route == NULL)
+			    || route == NULL) {
+				iface->has_multipath = 0;
 				continue;
+			}
 			iface->has_multipath = 1;
 			break;
 		case RTM_DELROUTE:
@@ -430,7 +432,7 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 
 	count = add_nexthops(&req.nlh, sizeof(req), iface_list, action_type);
 	if (count == 0)
-		return 0;
+		req.nlh.nlmsg_type = RTM_DELROUTE;
 
 	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
 		return -1;
