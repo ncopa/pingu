@@ -5,6 +5,12 @@
 
 #include "pingu_burst.h"
 
+#define PINGU_HOST_STATUS_OFFLINE 0
+#define PINGU_HOST_STATUS_ONLINE 1
+
+/* consider online by default */
+#define PINGU_HOST_DEFAULT_STATUS  PINGU_HOST_STATUS_ONLINE
+
 struct pingu_host {
 	struct list_head host_list_entry;
 	char *host;

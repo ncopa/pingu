@@ -68,9 +68,9 @@ int pingu_host_set_status(struct pingu_host *host, int status)
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
 {
 	if (host->burst.pings_replied >= host->required_replies) {
-		pingu_host_set_status(host, 1);
+		pingu_host_set_status(host, PINGU_HOST_STATUS_ONLINE);
 	} else if (host->burst.pings_sent >= host->max_retries) {
-		pingu_host_set_status(host, 0);
+		pingu_host_set_status(host, PINGU_HOST_STATUS_OFFLINE);
 	} else
 		pingu_ping_send(loop, host, 1);
 	return 0;
@@ -90,7 +90,7 @@ struct pingu_host *pingu_host_new(char *hoststr, float burst_interval,
 	}
 	
 	host->host = hoststr;
-	host->status = 1; /* online by default */
+	host->status = PINGU_HOST_DEFAULT_STATUS;
 	host->burst_interval = burst_interval;
 	host->max_retries = max_retries;
 	host->required_replies = required_replies;

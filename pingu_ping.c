@@ -93,14 +93,14 @@ int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
 	int seq, r;
 
 	if (!pingu_iface_usable(host->iface))
-		return pingu_host_set_status(host, 0) - 1;
+		return pingu_host_set_status(host, PINGU_HOST_STATUS_OFFLINE) - 1;
 
 	seq = pingu_ping_get_seq();
 	r = icmp_send_ping(host->iface->fd, &host->burst.saddr.sa,
 			       sizeof(host->burst.saddr), seq, packetlen);
 	if (r < 0) {
 		if (set_status_on_failure)
-			pingu_host_set_status(host, 0);
+			pingu_host_set_status(host, PINGU_HOST_STATUS_OFFLINE);
 		return -1;
 	}
 

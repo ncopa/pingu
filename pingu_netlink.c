@@ -374,7 +374,8 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 		case RTM_NEWROUTE:
 			host = pingu_host_find_by_iface(iface);
 			if ((!iface->balance) || iface->index == 0
-			    || (host != NULL && !host->status) || route == NULL)
+			    || (host != NULL && host->status == PINGU_HOST_STATUS_OFFLINE)
+			    || route == NULL)
 				continue;
 			iface->has_multipath = 1;
 			break;
