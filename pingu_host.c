@@ -72,7 +72,7 @@ int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
 	} else if (host->burst.pings_sent >= host->max_retries) {
 		pingu_host_set_status(host, PINGU_HOST_STATUS_OFFLINE);
 	} else
-		pingu_ping_send(loop, host, 1);
+		pingu_ping_send(loop, host, PINGU_PING_SET_STATUS_ON_ERROR);
 	return 0;
 }
 

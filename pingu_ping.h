@@ -6,6 +6,9 @@
 #include "list.h"
 #include "pingu_host.h"
 
+#define PINGU_PING_IGNORE_ERROR 0
+#define PINGU_PING_SET_STATUS_ON_ERROR 1
+
 struct pingu_ping {
 	int seq;
 	struct pingu_host *host;

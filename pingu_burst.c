@@ -40,7 +40,7 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 
 	for (rp = ai; rp != NULL; rp = rp->ai_next) {
 		sockaddr_from_addrinfo(&host->burst.saddr, ai);
-		r = pingu_ping_send(loop, host, 0);
+		r = pingu_ping_send(loop, host, PINGU_PING_IGNORE_ERROR);
 		if (r == 0)
 			break;
 	}
