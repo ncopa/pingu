@@ -17,6 +17,7 @@ struct pingu_iface {
 	int has_address;
 	int has_binding;
 	int has_route_rule;
+	int has_multipath;
 	int balance;
 	int balance_weight;
 	int fd;

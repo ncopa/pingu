@@ -337,9 +337,9 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 }
 
 static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
-			 struct pingu_iface *iface)
+		      struct pingu_iface *iface,
+		      struct pingu_gateway *route)
 {
-	struct pingu_gateway *route = pingu_gateway_first_default(&iface->gateway_list);
 	if (route == NULL)
 		return 0;
 	netlink_add_subrtattr_addr_any(rta, 1024, RTA_GATEWAY,
@@ -352,12 +352,13 @@ static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
 }
 
 static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
-			 struct list_head *iface_list)
+			 struct list_head *iface_list, int action_type)
 {
 	char buf[1024];
 	struct rtattr *rta = (void *)buf;
 	struct rtnexthop *rtnh;
 	struct pingu_iface *iface;
+	struct pingu_gateway *route;
 	int count = 0;
 
 	memset(buf, 0, sizeof(buf));
@@ -366,12 +367,24 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 	rtnh = RTA_DATA(rta);
 
 	list_for_each_entry(iface, iface_list, iface_list_entry) {
-		if ((!iface->balance) || iface->index == 0 || list_empty(&iface->gateway_list))
-			continue;
+		route = pingu_gateway_first_default(&iface->gateway_list);
+		switch (action_type) {
+		case RTM_NEWROUTE:
+			if ((!iface->balance) || iface->index == 0
+			    || route == NULL)
+				continue;
+			iface->has_multipath = 1;
+			break;
+		case RTM_DELROUTE:
+			if (!iface->has_multipath)
+				continue;
+			iface->has_multipath = 0;
+			break;
+		}
 		memset(rtnh, 0, sizeof(*rtnh));
 		rtnh->rtnh_len = sizeof(*rtnh);
 		rta->rta_len += rtnh->rtnh_len;
-		count += add_one_nh(rta, rtnh, iface);
+		count += add_one_nh(rta, rtnh, iface, route);
 		rtnh = RTNH_NEXT(rtnh);
 	}
 	if (rta->rta_len > RTA_LENGTH(0))
@@ -411,7 +424,7 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), RTA_DST,
 					&dest);
 
-	count = add_nexthops(&req.nlh, sizeof(req), iface_list);
+	count = add_nexthops(&req.nlh, sizeof(req), iface_list, action_type);
 	if (count == 0)
 		return 0;
 
