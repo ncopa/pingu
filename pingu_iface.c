@@ -170,7 +170,8 @@ void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 {
 	struct pingu_gateway *route;
 	list_for_each_entry(route, &iface->gateway_list, gateway_list_entry) {
-		kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
+		if (is_default_gw(route) && iface->has_address)
+			kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
 	}
 	kernel_route_multipath(action, &iface_list, RT_TABLE_MAIN);
 }
