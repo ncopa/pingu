@@ -639,7 +639,7 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	struct rtattr *rta[RTA_MAX+1];
 
 	struct pingu_gateway route;
-	int err;
+	int err = 0;
 
 	/* ignore route changes that we made ourselves via talk_fd */
 	if (msg->nlmsg_pid == getpid())
@@ -656,11 +656,15 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 		return;
 
 	log_route_change(&route, iface->name, iface->route_table, action);
-	err = netlink_route_modify(&talk_fd, action, &route,
-				   iface->index, iface->route_table);
+	/* Kernel will remove the alternate route when we lose the
+	 * address so we don't need try remove it ourselves */
+	if (action != RTM_DELROUTE || iface->has_address)
+		err = netlink_route_modify(&talk_fd, action, &route,
+					   iface->index, iface->route_table);
 	if (err > 0)
 		log_error("Failed to %s route to table %i",
-			  action == RTM_NEWROUTE ? "add" : "delete", iface->route_table);
+			  action == RTM_NEWROUTE ? "add" : "delete",
+			  iface->route_table);
 	pingu_iface_gw_action(iface, &route, action);
 }
 
