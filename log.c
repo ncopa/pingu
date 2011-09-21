@@ -22,10 +22,10 @@
 
 static int log_verbose = 0;
 
-void log_init(int verbose)
+void log_init(const char* prefix, int verbose)
 {
 	log_verbose = verbose;
-	openlog("pingu", LOG_PERROR | LOG_PID, LOG_DAEMON);
+	openlog(prefix, LOG_PERROR | LOG_PID, LOG_DAEMON);
 }
 
 void log_debug(const char *format, ...)

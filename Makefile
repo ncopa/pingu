@@ -17,6 +17,7 @@ pingu_OBJS = \
 	icmp.o \
 	log.o \
 	pingu.o \
+	pingu_adm.o \
 	pingu_burst.o \
 	pingu_conf.o \
 	pingu_gateway.o \
@@ -46,6 +47,6 @@ mtu: $(mtu_OBJS)
 install: $(TARGETS)
 	$(INSTALLDIR) $(DESTDIR)/$(BINDIR)
 	$(INSTALL) $(TARGETS) $(DESTDIR)/$(BINDIR)
-	
+
 clean:
 	rm -f $(TARGETS) $(ALL_OBJS)

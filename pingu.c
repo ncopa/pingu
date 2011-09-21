@@ -14,6 +14,7 @@
 
 #include "log.h"
 
+#include "pingu_adm.h"
 #include "pingu_conf.h"
 #include "pingu_host.h"
 #include "pingu_iface.h"
@@ -24,7 +25,7 @@
 #endif
 
 #ifndef DEFAULT_PIDFILE
-#define DEFAULT_PIDFILE "/var/run/pingu.pid"
+#define DEFAULT_PIDFILE "/var/run/pingu/pingu.pid"
 #endif
 
 int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
@@ -40,11 +41,11 @@ int usage(const char *program)
 	print_version(program);
 	fprintf(stderr, "usage: %s [-dh] [-c CONFIG] [-p PIDFILE]\n"
 		"options:\n"
-       		" -c  Read configuration from FILE (default is " 
+       		" -c  Read configuration from FILE (default is "
 			DEFAULT_CONFIG ")\n"
 		" -d  Fork to background (damonize)\n"
 		" -h  Show this help\n"
-		" -p  Use PIDFILE as pidfile (default is " 
+		" -p  Use PIDFILE as pidfile (default is "
 			DEFAULT_PIDFILE ")\n"
 		" -V  Print version and exit\n"
 		"\n",
@@ -119,12 +120,16 @@ int main(int argc, char *argv[])
 {
 	int c;
 	const char *config_file = DEFAULT_CONFIG;
+	const char *adm_socket = DEFAULT_ADM_SOCKET;
 	int verbose = 0;
 	static struct ev_loop *loop;
 	static struct ev_signal signal_watcher;
 
-	while ((c = getopt(argc, argv, "c:dhp:Vv")) != -1) {
+	while ((c = getopt(argc, argv, "a:c:dhp:Vv")) != -1) {
 		switch (c) {
+		case 'a':
+			adm_socket = optarg;
+			break;
 		case 'c':
 			config_file = optarg;
 			break;
@@ -148,30 +153,32 @@ int main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	log_init(verbose);
+	log_init("pingu", verbose);
 	loop = ev_default_loop(0);
-	
+
 	if (pingu_conf_parse(config_file) < 0)
 		return 1;
-	
+
 	if (pingu_iface_init(loop) < 0)
 		return 1;
-	
+
 	if (pingu_host_init(loop) < 0)
 		return 1;
-	
-	kernel_init(loop);
+
+	if (pingu_adm_init(loop, adm_socket) < 0)
+		return 1;
 
 	if (pingu_daemonize) {
 		if (daemonize() == -1)
 			return 1;
 	}
 
+	kernel_init(loop);
 	ev_signal_init(&signal_watcher, sigint_cb, SIGINT);
 	ev_signal_start(loop, &signal_watcher);
 
 	ev_run(loop, 0);
-
+	log_info("Shutting down");
 	pingu_iface_cleanup();
 	kernel_close();
 	return 0;

@@ -37,5 +37,6 @@ struct pingu_host *pingu_host_find_by_iface(struct pingu_iface *iface);
 int pingu_host_set_status(struct pingu_host *host, int status);
 int pingu_host_init(struct ev_loop *loop);
 int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host);
+void pingu_host_dump_status(int fd);
 
 #endif

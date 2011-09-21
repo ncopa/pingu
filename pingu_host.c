@@ -111,6 +111,17 @@ struct pingu_host *pingu_host_find_by_iface(struct pingu_iface *iface)
 	return NULL;
 }
 
+void pingu_host_dump_status(int fd)
+{
+	struct pingu_host *host;
+	char buf[512];
+	list_for_each_entry(host, &host_list, host_list_entry) {
+		snprintf(buf, sizeof(buf), "%s: %i\n", host->label, host->status);
+		write(fd, buf, strlen(buf));
+	}
+	write(fd, "", 1);
+}
+
 int pingu_host_init(struct ev_loop *loop)
 {
 	struct pingu_host *host;
