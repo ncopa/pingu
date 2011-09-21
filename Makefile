@@ -1,5 +1,5 @@
 
-TARGETS = mtu pingu
+TARGETS = mtu pingu pinguctl
 VERSION = 0.5
 
 CFLAGS ?= -g
@@ -30,17 +30,26 @@ pingu_OBJS = \
 
 pingu_LIBS = -lev
 
+pinguctl_OBJS = \
+	log.o \
+	pinguctl.o
+
+pinguctl_LIBS =
+
 mtu_OBJS = \
 	mtu.o \
 	netlink.o \
 	icmp.o
 
-ALL_OBJS= $(pingu_OBJS) $(mtu_OBJS)
+ALL_OBJS= $(pingu_OBJS) $(pinguctl_OBJS) $(mtu_OBJS)
 
 all: $(TARGETS)
 
 pingu: $(pingu_OBJS)
 	$(CC) $(LDFLAGS) $(pingu_OBJS) $(pingu_LIBS) -o $@
+
+pinguctl: $(pinguctl_OBJS)
+	$(CC) $(LDFLAGS) $(pinguctl_OBJS) $(pinguctl_LIBS) -o $@
 
 mtu: $(mtu_OBJS)
 
