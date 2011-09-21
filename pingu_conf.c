@@ -131,16 +131,16 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		if (strcmp(key, "route-table") == 0) {
 			pingu_iface_set_route_table(iface, atoi(value));
 		} else if (strcmp(key, "load-balance") == 0) {
-			iface->balance = 1;
+			int weight = 0;
 			if (value != NULL) {
-				iface->balance_weight = atoi(value);
-				if (iface->balance_weight <= 0 || iface->balance_weight > 256) {
+				weight = atoi(value);
+				if (weight <= 0 || weight > 256) {
 					log_error("Invalid load-balance weight %i on line %i",
-						  iface->balance_weight,
-						  conf->lineno);
+						  weight, conf->lineno);
 					return -1;
 				}
 			}
+			pingu_iface_set_balance(iface, weight);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  conf->lineno);

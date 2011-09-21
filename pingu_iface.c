@@ -26,6 +26,9 @@ static struct list_head iface_list = LIST_INITIALIZER(iface_list);
 #define PINGU_ROUTE_TABLE_MAX 253
 unsigned char used_route_table[256];
 
+/* do we have any load-balance at all? */
+static int load_balanced = 0;
+
 static void pingu_iface_socket_cb(struct ev_loop *loop, struct ev_io *w,
 				 int revents)
 {
@@ -136,6 +139,13 @@ void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 		inet_ntoa(iface->primary_addr.sin.sin_addr));
 }
 
+void pingu_iface_set_balance(struct pingu_iface *iface, int balance_weight)
+{
+	load_balanced++;
+	iface->balance = 1;
+	iface->balance_weight = balance_weight;
+}
+	
 #if 0
 void pingu_gateway_dump(struct pingu_iface *iface)
 {
@@ -162,7 +172,7 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 		log_debug("%s: removed route", iface->name);
 		break;
 	}
-	if (is_default_gw(gw))
+	if (load_balanced > 1 && is_default_gw(gw))
 		kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
 }
 
@@ -173,7 +183,8 @@ void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 		if (is_default_gw(route) && iface->has_address)
 			kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
 	}
-	kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
+	if (load_balanced > 1)
+		kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
 }
 
 int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
@@ -198,17 +209,6 @@ int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
 	return table;
 }
 
-static int pingu_iface_count_balanced(void)
-{
-	struct pingu_iface *iface;
-	int count = 0;
-	list_for_each_entry(iface, &iface_list, iface_list_entry) {
-		if (iface->balance && (iface->index != 0) && !list_empty(&iface->gateway_list))
-			count++;
-	}
-	return count;
-}
-
 int pingu_iface_init(struct ev_loop *loop)
 {
 	struct pingu_iface *iface;
@@ -218,6 +218,8 @@ int pingu_iface_init(struct ev_loop *loop)
 		if (pingu_iface_init_socket(loop, iface) == -1)
 			return -1;
 	}
+	if (load_balanced == 1)
+		log_warning("Only a single interface was configured with load-balance");
 	return 0;
 }
 
@@ -225,7 +227,7 @@ void pingu_iface_cleanup(void)
 {
 	struct pingu_iface *iface;
 	/* remove loadbalance route */
-	if (pingu_iface_count_balanced() > 1) {
+	if (load_balanced > 1) {
 		int err = kernel_route_multipath(RTM_DELROUTE, &iface_list, RT_TABLE_MAIN);
 		if (err > 0)
 			log_error("Failed to delete load-balance route: %s", strerror(err));
