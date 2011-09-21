@@ -119,7 +119,7 @@ void pingu_host_dump_status(int fd)
 		snprintf(buf, sizeof(buf), "%s: %i\n", host->label, host->status);
 		write(fd, buf, strlen(buf));
 	}
-	write(fd, "", 1);
+	write(fd, "\n", 1);
 }
 
 int pingu_host_init(struct ev_loop *loop)
