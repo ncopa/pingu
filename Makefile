@@ -2,16 +2,22 @@
 TARGETS = mtu pingu pinguctl
 VERSION = 0.5
 
-CFLAGS ?= -g
-CFLAGS += -DPINGU_VERSION=\"$(VERSION)\"
-CFLAGS += -Wall -Wstrict-prototypes -D_GNU_SOURCE -std=gnu99
-
 prefix = /usr
+localstatedir = /var
+rundir = $(localstatedir)/run
+pingustatedir = $(rundir)/pingu
+
 BINDIR = $(prefix)/bin
 DESTDIR ?=
 
 INSTALL = install
 INSTALLDIR = $(INSTALL) -d
+
+CFLAGS ?= -g
+CFLAGS += -DPINGU_VERSION=\"$(VERSION)\"
+CFLAGS += -Wall -Wstrict-prototypes -D_GNU_SOURCE -std=gnu99
+CFLAGS += -DDEFAULT_PIDFILE=\"$(pingustatedir)/pingu.pid\"
+CFLAGS += -DDEFAULT_ADM_SOCKET=\"$(pingustatedir)/pingu.ctl\"
 
 pingu_OBJS = \
 	icmp.o \
@@ -54,7 +60,7 @@ pinguctl: $(pinguctl_OBJS)
 mtu: $(mtu_OBJS)
 
 install: $(TARGETS)
-	$(INSTALLDIR) $(DESTDIR)/$(BINDIR)
+	$(INSTALLDIR) $(DESTDIR)/$(BINDIR) $(DESTDIR)/$(pingustatedir)
 	$(INSTALL) $(TARGETS) $(DESTDIR)/$(BINDIR)
 
 clean:
