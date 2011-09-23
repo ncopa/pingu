@@ -647,7 +647,7 @@ static void log_route_change(struct pingu_gateway *route,
 	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
 	if (gwstr[0] != '\0')
 		snprintf(viastr, sizeof(viastr), "via %s ", gwstr);
-	log_debug("%s route to %s/%i %sdev %s table %i", actionstr,
+	log_info("%s route to %s/%i %sdev %s table %i", actionstr,
 		  deststr, route->dst_len, viastr, ifname, table);
 }
 
