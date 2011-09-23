@@ -57,6 +57,7 @@ static void pingu_adm_recv_cb (struct ev_loop *loop, struct ev_io *w,
 	conn->cmd[conn->num_read] = '\0';
 
 	if (strncmp(conn->cmd, "status", len) == 0) {
+		log_debug("Admin command: %s", conn->cmd);
 		pingu_host_dump_status(conn->io.fd);
 		conn->cmd[0] = '\0';
 		conn->num_read = 0;
@@ -72,7 +73,7 @@ err:
 static void pingu_adm_timeout_cb (struct ev_loop *loop, struct ev_timer *t,
 				  int revents)
 {
-	log_debug("adm connection timed out");
+	log_debug("Admin connection timed out");
 	pingu_adm_free_conn(loop, container_of(t, struct adm_conn, timeout));
 }
 
@@ -89,7 +90,7 @@ static void pingu_adm_accept_cb(struct ev_loop *loop, struct ev_io *w,
 		log_perror("accept");
 		return;
 	}
-
+	log_debug("New admin connection");
 	fcntl(fd, F_SETFD, FD_CLOEXEC);
 	conn = calloc(1, sizeof(struct adm_conn));
 
