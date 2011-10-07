@@ -18,10 +18,15 @@
 
 static struct list_head host_list = LIST_INITIALIZER(host_list);
 
-static void execute_action(const char *action)
+void execute_action(const char *action)
 {
 	pid_t pid;
-	const char *shell = getenv("SHELL");
+	const char *shell;
+	
+	if (action == NULL)
+		return;
+
+	shell = getenv("SHELL");
 	if (shell == NULL)
 		shell = "/bin/sh";
 
@@ -41,7 +46,7 @@ static void execute_action(const char *action)
 int pingu_host_set_status(struct pingu_host *host, int status)
 {
 	const char *action;
-	int route_action = 0;
+	int adjustment;
 	host->burst.active = 0;
 	if (host->status == status) {
 		log_debug("%s: status is still %i", host->label, status);
@@ -50,18 +55,18 @@ int pingu_host_set_status(struct pingu_host *host, int status)
 	host->status = status;
 	log_info("%s: new status: %i", host->label, status);
 	switch (host->status) {
-	case 0:
+	case PINGU_HOST_STATUS_OFFLINE:
 		action = host->down_action;
-		route_action = RTM_DELROUTE;
+		adjustment = -1;
 		break;
-	case 1:
+	case PINGU_HOST_STATUS_ONLINE:
 		action = host->up_action;
-		route_action =  RTM_NEWROUTE;
+		adjustment = 1;
 		break;
 	}
-	if (action != NULL)
-		execute_action(action);
-	pingu_iface_update_routes(host->iface, route_action);
+
+	execute_action(action);
+	pingu_iface_adjust_hosts_online(host->iface, adjustment);
 	return status;
 }
 
@@ -78,17 +83,17 @@ int pingu_host_verify_status(struct ev_loop *loop, struct pingu_host *host)
 
 struct pingu_host *pingu_host_new(char *hoststr, float burst_interval,
 				  int max_retries, int required_replies,
-				  float timeout, 
+				  float timeout,
 				  const char *up_action,
 				  const char *down_action)
 {
 	struct pingu_host *host = calloc(1, sizeof(struct pingu_host));
-	
+
 	if (host == NULL) {
 		log_perror(hoststr);
 		return NULL;
 	}
-	
+
 	host->host = hoststr;
 	host->status = PINGU_HOST_DEFAULT_STATUS;
 	host->burst_interval = burst_interval;
@@ -97,18 +102,9 @@ struct pingu_host *pingu_host_new(char *hoststr, float burst_interval,
 	host->timeout = timeout;
 	host->up_action = up_action;
 	host->down_action = down_action;
-	
+
 	list_add(&host->host_list_entry, &host_list);
 	return host;
-}
-
-struct pingu_host *pingu_host_find_by_iface(struct pingu_iface *iface)
-{
-	struct pingu_host *host;
-	list_for_each_entry(host, &host_list, host_list_entry)
-		if (host->iface == iface)
-			return host;
-	return NULL;
 }
 
 void pingu_host_dump_status(int fd)
@@ -131,6 +127,10 @@ int pingu_host_init(struct ev_loop *loop)
 		ev_timer_init(&host->burst_timeout_watcher,
 			      pingu_burst_timeout_cb, 0, host->burst_interval);
 		ev_timer_start(loop, &host->burst_timeout_watcher);
+
+		if (host->iface->required_hosts_online == 0)
+			host->iface->required_hosts_online = 1;
+		host->iface->hosts_online += PINGU_HOST_DEFAULT_STATUS;
 	}
 	return 0;
 }

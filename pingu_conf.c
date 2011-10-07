@@ -130,6 +130,14 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 			break;
 		if (strcmp(key, "route-table") == 0) {
 			pingu_iface_set_route_table(iface, atoi(value));
+		} else if (strcmp(key, "label") == 0) {
+			iface->label = xstrdup(value);
+		} else if (strcmp(key, "gateway-up-action") == 0) {
+			iface->gw_up_action = xstrdup(value);
+		} else if (strcmp(key, "gateway-down-action") == 0) {
+			iface->gw_down_action = xstrdup(value);
+		} else if (strcmp(key, "required-hosts-online") == 0) {
+			iface->required_hosts_online = atoi(value);
 		} else if (strcmp(key, "load-balance") == 0) {
 			int weight = 0;
 			if (value != NULL) {

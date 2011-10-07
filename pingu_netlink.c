@@ -360,7 +360,6 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 	struct rtnexthop *rtnh;
 	struct pingu_iface *iface;
 	struct pingu_route *route;
-	struct pingu_host *host;
 	int count = 0;
 
 	memset(buf, 0, sizeof(buf));
@@ -372,9 +371,8 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 		route = pingu_route_first_default(&iface->route_list);
 		switch (action_type) {
 		case RTM_NEWROUTE:
-			host = pingu_host_find_by_iface(iface);
 			if ((!iface->balance) || iface->index == 0
-			    || (host != NULL && host->status == PINGU_HOST_STATUS_OFFLINE)
+			    || !pingu_iface_gw_is_online(iface)
 			    || route == NULL) {
 				iface->has_multipath = 0;
 				continue;

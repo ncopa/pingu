@@ -12,6 +12,12 @@
 
 struct pingu_iface {
 	char name[32];
+	char *label;
+	char *gw_up_action;
+	char *gw_down_action;
+	int hosts_online;
+	int required_hosts_online;
+	
 	int index;
 	int has_link;
 	int has_address;
@@ -39,7 +45,10 @@ int pingu_iface_init(struct ev_loop *loop);
 void pingu_iface_set_balance(struct pingu_iface *iface, int balance_weight);
 void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 			  void *data, int len);
+void pingu_iface_adjust_hosts_online(struct pingu_iface *iface, int adjustment);
 int pingu_iface_set_route_table(struct pingu_iface *iface, int table);
+
+int pingu_iface_gw_is_online(struct pingu_iface *iface);
 void pingu_iface_gw_action(struct pingu_iface *iface,
 			   struct pingu_route *gw, int action);
 void pingu_iface_update_routes(struct pingu_iface *iface, int action);

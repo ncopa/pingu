@@ -145,7 +145,7 @@ void pingu_iface_set_balance(struct pingu_iface *iface, int balance_weight)
 	iface->balance = 1;
 	iface->balance_weight = balance_weight;
 }
-	
+
 #if 0
 void pingu_route_dump(struct pingu_iface *iface)
 {
@@ -185,6 +185,40 @@ void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 	}
 	if (load_balanced > 1)
 		kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
+}
+
+int pingu_iface_gw_is_online(struct pingu_iface *iface)
+{
+	return iface->hosts_online >= iface->required_hosts_online;
+}
+
+/* check if we should bring up/down this ISP */
+void pingu_iface_adjust_hosts_online(struct pingu_iface *iface, int adjustment)
+{
+	int old_status, new_status, route_action;
+	char *action, *statusstr;
+
+	old_status = pingu_iface_gw_is_online(iface);
+	iface->hosts_online += adjustment;
+	new_status = pingu_iface_gw_is_online(iface);
+
+	if (old_status == new_status)
+		return;
+
+	if (new_status) {
+		statusstr = "ONLINE";
+		route_action = RTM_NEWROUTE;
+		action = iface->gw_up_action;
+	} else {
+		statusstr = "OFFLINE";
+		route_action = RTM_DELROUTE;
+		action = iface->gw_down_action;
+	}	
+	
+	log_info("%s: went %s", iface->label ? iface->label : iface->name,
+		 statusstr);
+	pingu_iface_update_routes(iface, route_action);
+	execute_action(action);
 }
 
 int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
