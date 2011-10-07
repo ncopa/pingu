@@ -299,7 +299,7 @@ static int netlink_enumerate(struct netlink_fd *fd, int family, int type)
 }
 
 int netlink_route_modify(struct netlink_fd *fd, int action_type,
-			  struct pingu_gateway *route,
+			  struct pingu_route *route,
 			  int iface_index, int table)
 {
 	struct {
@@ -339,7 +339,7 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 
 static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
 		      struct pingu_iface *iface,
-		      struct pingu_gateway *route)
+		      struct pingu_route *route)
 {
 	if (route == NULL)
 		return 0;
@@ -359,7 +359,7 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 	struct rtattr *rta = (void *)buf;
 	struct rtnexthop *rtnh;
 	struct pingu_iface *iface;
-	struct pingu_gateway *route;
+	struct pingu_route *route;
 	struct pingu_host *host;
 	int count = 0;
 
@@ -369,7 +369,7 @@ static int add_nexthops(struct nlmsghdr *nlh, size_t nlh_size,
 	rtnh = RTA_DATA(rta);
 
 	list_for_each_entry(iface, iface_list, iface_list_entry) {
-		route = pingu_gateway_first_default(&iface->gateway_list);
+		route = pingu_route_first_default(&iface->route_list);
 		switch (action_type) {
 		case RTM_NEWROUTE:
 			host = pingu_host_find_by_iface(iface);
@@ -440,14 +440,14 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 }
 
 int netlink_route_replace_or_add(struct netlink_fd *fd,
-				 struct pingu_gateway *route,
+				 struct pingu_route *route,
 				 int iface_index, int table)
 {
 	return netlink_route_modify(fd, RTM_NEWROUTE, route, iface_index, table);
 }
 
 int netlink_route_delete(struct netlink_fd *fd,
-			 struct pingu_gateway *route,
+			 struct pingu_route *route,
 			 int iface_index, int table)
 {
 	return netlink_route_modify(fd, RTM_DELROUTE, route, iface_index, table);
@@ -455,9 +455,9 @@ int netlink_route_delete(struct netlink_fd *fd,
 
 static void netlink_route_flush(struct netlink_fd *fd, struct pingu_iface *iface)
 {
-	struct pingu_gateway *gw;
+	struct pingu_route *gw;
 	int err;
-	list_for_each_entry(gw, &iface->gateway_list, gateway_list_entry) {
+	list_for_each_entry(gw, &iface->route_list, route_list_entry) {
 		err = netlink_route_delete(fd, gw, iface->index, iface->route_table);
 		if (err > 0)
 			log_error("%s: Failed to clean up route in table %i: ",
@@ -609,7 +609,7 @@ static void netlink_addr_del_cb(struct nlmsghdr *nlmsg)
 	pingu_iface_set_addr(iface, 0, NULL, 0);
 }
 
-static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
+static struct pingu_route *gw_from_rtmsg(struct pingu_route *gw,
 					      struct rtmsg *rtm,
 					      struct rtattr **rta)
 {
@@ -635,7 +635,7 @@ static struct pingu_gateway *gw_from_rtmsg(struct pingu_gateway *gw,
 	return gw;
 }
 
-static void log_route_change(struct pingu_gateway *route,
+static void log_route_change(struct pingu_route *route,
 			     char *ifname, int table, int action)
 {
 	char deststr[64] = "", gwstr[64] = "", viastr[68] = "";
@@ -657,7 +657,7 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	struct rtmsg *rtm = NLMSG_DATA(msg);
 	struct rtattr *rta[RTA_MAX+1];
 
-	struct pingu_gateway route;
+	struct pingu_route route;
 	int err = 0;
 
 	/* ignore route changes that we made ourselves via talk_fd */
@@ -768,7 +768,7 @@ error:
 }
 
 
-int kernel_route_modify(int action, struct pingu_gateway *route,
+int kernel_route_modify(int action, struct pingu_route *route,
 			struct pingu_iface *iface, int table)
 {
 	log_route_change(route, iface->name, table, action);

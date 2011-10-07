@@ -32,11 +32,11 @@ pingu_OBJS = \
 	pingu_adm.o \
 	pingu_burst.o \
 	pingu_conf.o \
-	pingu_gateway.o \
 	pingu_host.o \
 	pingu_iface.o \
 	pingu_netlink.o \
 	pingu_ping.o \
+	pingu_route.o \
 	sockaddr_util.o \
 	xlib.o
 

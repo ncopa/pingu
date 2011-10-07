@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <ev.h>
 
-#include "pingu_gateway.h"
+#include "pingu_route.h"
 #include "sockaddr_util.h"
 #include "list.h"
 
@@ -25,7 +25,7 @@ struct pingu_iface {
 	int route_table;
 	struct list_head iface_list_entry;
 	struct list_head ping_list;
-	struct list_head gateway_list;
+	struct list_head route_list;
 	struct ev_io socket_watcher;
 };
 
@@ -41,7 +41,7 @@ void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 			  void *data, int len);
 int pingu_iface_set_route_table(struct pingu_iface *iface, int table);
 void pingu_iface_gw_action(struct pingu_iface *iface,
-			   struct pingu_gateway *gw, int action);
+			   struct pingu_route *gw, int action);
 void pingu_iface_update_routes(struct pingu_iface *iface, int action);
 void pingu_iface_cleanup(void);
 

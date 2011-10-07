@@ -118,7 +118,7 @@ struct pingu_iface *pingu_iface_get_by_name_or_new(const char *name)
 		strlcpy(iface->name, name, sizeof(iface->name));
 
 	list_init(&iface->ping_list);
-	list_init(&iface->gateway_list);
+	list_init(&iface->route_list);
 	list_add(&iface->iface_list_entry, &iface_list);
 	return iface;
 }
@@ -130,7 +130,7 @@ void pingu_iface_set_addr(struct pingu_iface *iface, int family,
 	if (len <= 0 || data == NULL) {
 		iface->has_address = 0;
 		iface->has_binding = 0;
-		pingu_gateway_del_all(&iface->gateway_list);
+		pingu_route_del_all(&iface->route_list);
 		log_debug("%s: address removed", iface->name);
 		return;
 	}
@@ -147,10 +147,10 @@ void pingu_iface_set_balance(struct pingu_iface *iface, int balance_weight)
 }
 	
 #if 0
-void pingu_gateway_dump(struct pingu_iface *iface)
+void pingu_route_dump(struct pingu_iface *iface)
 {
-	struct pingu_gateway *gw;
-	list_for_each_entry(gw, &iface->gateway_list, gateway_list_entry) {
+	struct pingu_route *gw;
+	list_for_each_entry(gw, &iface->route_list, route_list_entry) {
 		char buf[64];
 		sockaddr_to_string(&gw->gw_addr, buf, sizeof(buf));
 		log_debug("dump: %s: via %s metric %i", iface->name, buf,
@@ -160,15 +160,15 @@ void pingu_gateway_dump(struct pingu_iface *iface)
 #endif
 
 void pingu_iface_gw_action(struct pingu_iface *iface,
-			 struct pingu_gateway *gw, int action)
+			 struct pingu_route *gw, int action)
 {
 	switch (action) {
 	case RTM_NEWROUTE:
-		pingu_gateway_add(&iface->gateway_list, gw);
+		pingu_route_add(&iface->route_list, gw);
 		log_debug("%s: added route", iface->name);
 		break;
 	case RTM_DELROUTE:
-		pingu_gateway_del(&iface->gateway_list, gw);
+		pingu_route_del(&iface->route_list, gw);
 		log_debug("%s: removed route", iface->name);
 		break;
 	}
@@ -178,8 +178,8 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 
 void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 {
-	struct pingu_gateway *route;
-	list_for_each_entry(route, &iface->gateway_list, gateway_list_entry) {
+	struct pingu_route *route;
+	list_for_each_entry(route, &iface->route_list, route_list_entry) {
 		if (is_default_gw(route) && iface->has_address)
 			kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
 	}
