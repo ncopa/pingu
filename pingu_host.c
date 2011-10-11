@@ -45,7 +45,7 @@ void execute_action(const char *action)
 
 int pingu_host_set_status(struct pingu_host *host, int status)
 {
-	const char *action;
+	const char *action, *statusstr = "";
 	int adjustment;
 	host->burst.active = 0;
 	if (host->status == status) {
@@ -53,17 +53,19 @@ int pingu_host_set_status(struct pingu_host *host, int status)
 		return status;
 	}
 	host->status = status;
-	log_info("%s: new status: %i", host->label, status);
 	switch (host->status) {
 	case PINGU_HOST_STATUS_OFFLINE:
 		action = host->down_action;
 		adjustment = -1;
+		statusstr = "OFFLINE";
 		break;
 	case PINGU_HOST_STATUS_ONLINE:
 		action = host->up_action;
 		adjustment = 1;
+		statusstr = "ONLINE";
 		break;
 	}
+	log_info("%s: went %s", host->label, statusstr);
 
 	execute_action(action);
 	pingu_iface_adjust_hosts_online(host->iface, adjustment);
