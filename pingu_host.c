@@ -125,7 +125,7 @@ int pingu_host_init(struct ev_loop *loop)
 		if (host->label == NULL)
 			host->label = host->host;
 		ev_timer_init(&host->burst_timeout_watcher,
-			      pingu_burst_timeout_cb, 0, host->burst_interval);
+			      pingu_burst_timeout_cb, 1.0, host->burst_interval);
 		ev_timer_start(loop, &host->burst_timeout_watcher);
 
 		if (host->iface->required_hosts_online == 0)
