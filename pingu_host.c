@@ -109,11 +109,13 @@ struct pingu_host *pingu_host_new(char *hoststr, float burst_interval,
 	return host;
 }
 
-void pingu_host_dump_status(int fd)
+void pingu_host_dump_status(int fd, char *filter)
 {
 	struct pingu_host *host;
 	char buf[512];
 	list_for_each_entry(host, &host_list, host_list_entry) {
+		if (filter != NULL && strcmp(filter, host->label) != 0)
+			continue;
 		snprintf(buf, sizeof(buf), "%s: %i\n", host->label, host->status);
 		write(fd, buf, strlen(buf));
 	}

@@ -2,18 +2,26 @@
 module(..., package.seeall)
 
 
-local function status(self)
-	self.handle:write("status\n")
+local function run_command(self, cmd)
+	self.handle:write(cmd.."\n")
 	self.handle:flush()
 
 	local t = {}
 	local line = self.handle:read("*line")
 	while line ~= "" do
-		local host, status = string.match(line, "^(.*): (.*)$")
-		t[host] = status
+		local key, value = string.match(line, "^(.*): (.*)$")
+		t[key] = value
 		line = self.handle:read("*line")
 	end
 	return t
+end
+
+local function host_status(self)
+	return self:run_command("host-status")
+end
+
+local function gateway_status(self)
+	return self:run_command("gateway-status")
 end
 
 local function close(self)
@@ -31,7 +39,9 @@ function connect(socket_path)
 	end
 	return {
 		["handle"] = fh,
-		["status"] = status,
+		["run_command"] = run_command,
+		["host_status"] = host_status,
+		["gateway_status"] = gateway_status,
 		["close"] = close
 	}
 end

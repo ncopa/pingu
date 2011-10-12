@@ -13,6 +13,7 @@
 #include "list.h"
 #include "log.h"
 #include "pingu_adm.h"
+#include "pingu_iface.h"
 #include "pingu_host.h"
 
 static struct ev_io accept_io;
@@ -34,11 +35,21 @@ static void pingu_adm_free_conn(struct ev_loop *loop, struct adm_conn *rm)
         free(rm);
 }
 
+static struct {
+	const char *command;
+	void (*handler)(int fd, char *args);
+} adm_handler[] = {
+	{ "host-status",	pingu_host_dump_status },
+	{ "gateway-status",	pingu_iface_dump_status },
+	{ NULL,			NULL }
+};
+	
 static void pingu_adm_recv_cb (struct ev_loop *loop, struct ev_io *w,
 			       int revents)
 {
 	struct adm_conn *conn = container_of(w, struct adm_conn, io);
-	int len;
+	int len, i;
+	char *args;
 
 	len = recv(conn->io.fd, conn->cmd, sizeof(conn->cmd) - conn->num_read,
 		   MSG_DONTWAIT);
@@ -55,15 +66,24 @@ static void pingu_adm_recv_cb (struct ev_loop *loop, struct ev_io *w,
 
 	conn->num_read--;
 	conn->cmd[conn->num_read] = '\0';
+	
+	args = strchr(conn->cmd, ' ');
+	if (args != NULL)
+		*args++ = '\0';
 
-	if (strncmp(conn->cmd, "status", len) == 0) {
+	for (i = 0; adm_handler[i].command != NULL; i++) {
+		if (strncmp(conn->cmd, adm_handler[i].command, len) != 0)
+			continue;
 		log_debug("Admin command: %s", conn->cmd);
-		pingu_host_dump_status(conn->io.fd);
+		adm_handler[i].handler(conn->io.fd, args);
 		conn->cmd[0] = '\0';
 		conn->num_read = 0;
-	} else {
-		log_error("unknown adm command");
+		break;
 	}
+
+	if (adm_handler[i].command == NULL)
+		log_error("%s: unknown admim command", conn->cmd);
+
 	return;
 
 err:

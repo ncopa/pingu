@@ -243,6 +243,21 @@ int pingu_iface_set_route_table(struct pingu_iface *iface, int table)
 	return table;
 }
 
+void pingu_iface_dump_status(int fd, char *filter)
+{
+	struct pingu_iface *iface;
+	char buf[512];
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (filter != NULL && strcmp(filter, iface->label) != 0)
+			continue;
+		snprintf(buf, sizeof(buf), "%s: %i\n",
+			 iface->label != NULL ? iface->label : iface->name,
+			 pingu_iface_gw_is_online(iface));
+		write(fd, buf, strlen(buf));
+	}
+	write(fd, "\n", 1);	
+}
+
 int pingu_iface_init(struct ev_loop *loop)
 {
 	struct pingu_iface *iface;

@@ -51,6 +51,8 @@ int pingu_iface_set_route_table(struct pingu_iface *iface, int table);
 int pingu_iface_gw_is_online(struct pingu_iface *iface);
 void pingu_iface_gw_action(struct pingu_iface *iface,
 			   struct pingu_route *gw, int action);
+
+void pingu_iface_dump_status(int fd, char *filter);			   
 void pingu_iface_update_routes(struct pingu_iface *iface, int action);
 void pingu_iface_cleanup(void);
 
