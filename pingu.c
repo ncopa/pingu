@@ -39,15 +39,19 @@ static void print_version(const char *program)
 int usage(const char *program)
 {
 	print_version(program);
-	fprintf(stderr, "usage: %s [-dh] [-c CONFIG] [-p PIDFILE]\n"
+	fprintf(stderr, "usage: %s [-dhiv] [-a ADMSOCKET] [-c CONFIG] [-p PIDFILE]\n"
+		"\n"
 		"options:\n"
-       		" -c  Read configuration from FILE (default is "
+		" -a  Use administration socket ADMSOCKET (default is "
+			DEFAULT_ADM_SOCKET ")\n"
+       		" -c  Read configuration from CONFIG (default is "
 			DEFAULT_CONFIG ")\n"
 		" -d  Fork to background (damonize)\n"
 		" -h  Show this help\n"
 		" -p  Use PIDFILE as pidfile (default is "
 			DEFAULT_PIDFILE ")\n"
 		" -V  Print version and exit\n"
+		" -v  Run in verbose mode. Will log debug messages\n"
 		"\n",
 		program);
 	return 1;
