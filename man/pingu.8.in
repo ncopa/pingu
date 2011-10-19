@@ -1,0 +1,60 @@
+.Dd October 14, 2011
+.Dt PINGU 8 Linux
+.Os
+
+.Sh NAME
+.Nm pingu
+.Nd multi ISP failover and load-balancing daemon
+
+.Sh SYNOPSIS
+.Nm
+.Op Fl dhvV
+.Op Fl a SOCKETPATH
+.Op Fl c CONFIG
+.Op Fl p PIDFILE
+
+.Sh DESCRIPTION
+The pingu utility monitors specified interfaces and sets up an alternate
+route table for each specified interface in which it mirrors all routes
+using that interface. It also sets up a route rule so that this alternate
+route table is looked up for traffic where the source IP address matches
+the primary IP address of the corresponding interface. This guarantees
+that a service bound to the primary address of an interface will always
+use routes from that interface.
+.Pp
+It can also ping specified hosts at regular intervals to detect if a
+gateway via a certain interface goes down. It will then remove the default
+gateway(s) via this interface from main route table so that traffic not
+bound to the failed interface will fail over to other configured interfaces.
+.Pp
+Pingu can also set up a multipath nexthop defafult route for interfaces
+configured as "load-balance"
+.Bl -tag -width indent
+.It Fl a
+Use SOCKETPATH as administration socket instead of the default @DEFAULT_ADM_SOCKET@
+.It Fl c
+Use config file CONFIG instead of the default /etc/pingu/pingu.conf
+.It Fl d
+Fork to background (daemonize).
+.It Fl h
+Show short help text.
+.It Fl p
+Use PIDFILE as pidfile instead of the default /var/run/pingu/pingu.pid
+.It Fl V
+Print version and exit.
+.It Fl v
+Run in verbose mode. Will log debug messages,
+.El
+
+.Sh FILES
+/etc/pingu/pingu.conf
+.br
+/var/run/pingu/pingu.pid
+.br
+/var/run/pingu/pingu.ctl
+
+.Sh AUTHORS
+.An Natanael Copa
+.Aq ncopa@alpinelinux.org
+
+

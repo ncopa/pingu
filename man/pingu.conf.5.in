@@ -1,0 +1,97 @@
+.Dd October 19, 2011
+.Dt PINGU.CONF 8 Linux
+.Os
+
+.Sh NAME
+.Nm pingu.conf
+.Nd pingu daemon configuration file
+
+.Sh DESCRIPTION
+The file can contain 3 different contexts: Global context, interface context
+and host context.
+.Pp
+Blank lines and lines starting with # are ignored.
+
+
+.Sh GLOBAL CONTEXT
+The config file starts in global context. In this section the default values
+for the keywards used in interface on hosts sections are set. Values set in
+global context can be overridden in interface and host sections.
+
+.Bl -tag -indent
+.It Cd interval
+Set the default ping burst interval
+.It Cd timeout
+The default ping timout value in seconds. If the ping response does not come
+back within "timeout" seconds the ping is considered lost.
+.It Cd required
+The minimum required ping responses of a burst to consider the host online.
+.It Cd retries
+Maximum sent ping packets for a burst.
+.It Cd up-action
+The default action to execute when a ping host goes online.
+.It Cd down-action
+The default action to execute when a ping host goes offline.
+.El
+
+.Sh INTERFACE CONTEXT
+Example:
+.Bd -literal
+interface eth0 {
+	keyword value
+	...
+}
+.Ed
+
+The keywords valid in an interface sections are:
+.Bl -tag -indent
+.It Cd gateway-down-action
+Execute this action when a gateway is considered offline.
+.It Cd gateway-up-action
+Execute this action when a gateway is considered online.
+.It Cd label
+A user defined label that will be used in logs and by pinguctl
+.It Cd load-balance
+Enable balancing for this interface. Minimum 2 interfaces needs be configured
+for load-balancing to work. An option weight value can be given.
+.It Cd required-hosts-online
+The minimum number of ping hosts that needs to be online to consider the
+gateway online.
+.It Cd route-table
+The alternate route table for this interface.
+.El
+
+.Sh HOST CONTEXT
+Example:
+.Bd -literal
+host 1.2.3.4 {
+	keyword value
+	...
+}
+.Ed
+
+.Bl -tag -indent
+.It Cd bind-interface
+Bind the pings to this interface.
+.It Cd down-action
+Execute this action when ping host goes offline
+.It Cd interval
+The interval for ping bursts
+.It Cd label
+A label to be used in logs and pinguctl
+.It Cd required
+The number of required ping responses to consider host online.
+.It Cd retry
+The maximum number of retries for a ping burst.
+.It Cd timeout
+The ping response timeout value in seconds. If no ping respons returns within
+this value the ping is considered lost.
+.It Cd up-action
+Execute this action when a ping host goes online
+.El
+
+.Sh AUTHORS
+.An Natanael Copa
+.Aq ncopa@alpinelinux.org
+
+
