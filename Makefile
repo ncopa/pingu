@@ -17,7 +17,7 @@ INSTALL = install
 INSTALLDIR = $(INSTALL) -d
 PKG_CONFIG ?= pkg-config
 
-
+SUBDIRS := man
 
 CFLAGS ?= -g
 CFLAGS += -DPINGU_VERSION=\"$(VERSION)\"
@@ -61,7 +61,7 @@ client.so_LDFLAGS = -shared
 
 ALL_OBJS= $(pingu_OBJS) $(pinguctl_OBJS) $(mtu_OBJS) $(client.so_OBJS)
 
-all: $(TARGETS)
+all: $(TARGETS) man
 
 $(TARGETS):
 	$(CC) $(LDFLAGS) $($@_LDFLAGS) $($@_OBJS) $($@_LIBS) -o $@
@@ -71,9 +71,15 @@ pinguctl: $(pinguctl_OBJS)
 client.so: $(client.so_OBJS)
 mtu: $(mtu_OBJS)
 
+$(SUBDIRS):
+	$(MAKE) -C $@
+
 install: $(TARGETS)
 	$(INSTALLDIR) $(DESTDIR)/$(BINDIR) $(DESTDIR)/$(pingustatedir)
 	$(INSTALL) $(TARGETS) $(DESTDIR)/$(BINDIR)
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir $@ || break; \
+	done
 
 install-lua: client.so pingu.lua
 	$(INSTALLDIR) $(DESTDIR)$(luasharedir) \
@@ -83,3 +89,6 @@ install-lua: client.so pingu.lua
 
 clean:
 	rm -f $(TARGETS) $(ALL_OBJS)
+	$(MAKE) -C man clean
+
+.PHONY: $(SUBDIRS)
