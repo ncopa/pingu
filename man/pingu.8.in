@@ -1,4 +1,4 @@
-.Dd October 14, 2011
+.Dd October 19, 2011
 .Dt PINGU 8 Linux
 .Os
 
@@ -33,13 +33,13 @@ configured as "load-balance"
 .It Fl a
 Use SOCKETPATH as administration socket instead of the default @DEFAULT_ADM_SOCKET@
 .It Fl c
-Use config file CONFIG instead of the default /etc/pingu/pingu.conf
+Use config file CONFIG instead of the default @DEFAULT_CONFIG@
 .It Fl d
 Fork to background (daemonize).
 .It Fl h
 Show short help text.
 .It Fl p
-Use PIDFILE as pidfile instead of the default /var/run/pingu/pingu.pid
+Use PIDFILE as pidfile instead of the default @DEFAULT_PIDFILE@
 .It Fl V
 Print version and exit.
 .It Fl v
@@ -47,11 +47,11 @@ Run in verbose mode. Will log debug messages,
 .El
 
 .Sh FILES
-/etc/pingu/pingu.conf
+@DEFAULT_CONFIG@
 .br
-/var/run/pingu/pingu.pid
+@DEFAULT_PIDFILE@
 .br
-/var/run/pingu/pingu.ctl
+@DEFAULT_ADM_SOCKET@
 
 .Sh AUTHORS
 .An Natanael Copa
