@@ -10,7 +10,7 @@ pingustatedir = $(rundir)/pingu
 luasharedir = /usr/share/lua/5.1
 lualibdir = /usr/lib/lua/5.1
 
-BINDIR = $(prefix)/bin
+SBINDIR = $(prefix)/sbin
 DESTDIR ?=
 
 INSTALL = install
@@ -75,8 +75,8 @@ $(SUBDIRS):
 	$(MAKE) -C $@
 
 install: $(TARGETS)
-	$(INSTALLDIR) $(DESTDIR)/$(BINDIR) $(DESTDIR)/$(pingustatedir)
-	$(INSTALL) $(TARGETS) $(DESTDIR)/$(BINDIR)
+	$(INSTALLDIR) $(DESTDIR)/$(SBINDIR) $(DESTDIR)/$(pingustatedir)
+	$(INSTALL) $(TARGETS) $(DESTDIR)/$(SBINDIR)
 	for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir $@ || break; \
 	done
