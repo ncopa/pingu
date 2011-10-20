@@ -3,7 +3,7 @@ BIN_TARGETS = mtu
 SBIN_TARGETS = pingu pinguctl
 LUA_TARGETS = client.so
 TARGETS = $(BIN_TARGETS) $(SBIN_TARGETS) $(LUA_TARGETS)
-VERSION = 0.5
+VERSION = 1.0
 
 prefix = /usr
 localstatedir = /var
