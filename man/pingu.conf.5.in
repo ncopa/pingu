@@ -15,7 +15,7 @@ Blank lines and lines starting with # are ignored.
 
 .Sh GLOBAL CONTEXT
 The config file starts in global context. In this section the default values
-for the keywards used in interface on hosts sections are set. Values set in
+for the keywords used in interface on hosts sections are set. Values set in
 global context can be overridden in interface and host sections.
 
 .Bl -tag -indent
@@ -50,10 +50,11 @@ Execute this action when a gateway is considered offline.
 .It Cd gateway-up-action
 Execute this action when a gateway is considered online.
 .It Cd label
-A user defined label that will be used in logs and by pinguctl
+A user defined label that will be used in logs and by pinguctl.
 .It Cd load-balance
-Enable balancing for this interface. Minimum 2 interfaces needs be configured
-for load-balancing to work. An option weight value can be given.
+Enable balancing for this interface. A minimum of two interfaces need to
+be configured in order for load-balancing to work. An optional weight
+value can be given.
 .It Cd required-hosts-online
 The minimum number of ping hosts that needs to be online to consider the
 gateway online.
@@ -84,7 +85,7 @@ The number of required ping responses to consider host online.
 .It Cd retry
 The maximum number of retries for a ping burst.
 .It Cd timeout
-The ping response timeout value in seconds. If no ping respons returns within
+The ping response timeout value in seconds. If no ping response returns within
 this value the ping is considered lost.
 .It Cd up-action
 Execute this action when a ping host goes online
