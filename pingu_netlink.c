@@ -17,7 +17,7 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/ip.h>
-#include <linux/if.h>
+#include <net/if.h>
 #include <linux/fib_rules.h>
 #include <netinet/in.h>
 
@@ -37,6 +37,11 @@
 #include "pingu_iface.h"
 #include "pingu_host.h"
 #include "pingu_netlink.h"
+
+#ifndef IFF_LOWER_UP
+/* from linux/if.h which conflicts with net/if.h */
+#define IFF_LOWER_UP	0x10000		/* driver signals L1 up	*/
+#endif
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
@@ -299,8 +304,8 @@ static int netlink_enumerate(struct netlink_fd *fd, int family, int type)
 }
 
 int netlink_route_modify(struct netlink_fd *fd, int action_type,
-			  struct pingu_route *route,
-			  int iface_index, int table)
+			 struct pingu_route *route,
+			 int table)
 {
 	struct {
 		struct nlmsghdr	nlh;
@@ -327,7 +332,7 @@ int netlink_route_modify(struct netlink_fd *fd, int action_type,
 					&route->dest);
 	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), RTA_GATEWAY,
 					&route->gw_addr);
-	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_OIF, &iface_index, 4);
+	netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_OIF, &route->dev_index, 4);
 	if (route->metric != 0)
 		netlink_add_rtattr_l(&req.nlh, sizeof(req), RTA_PRIORITY,
 				     &route->metric, 4);
@@ -439,16 +444,16 @@ int netlink_route_multipath(struct netlink_fd *fd, int action_type,
 
 int netlink_route_replace_or_add(struct netlink_fd *fd,
 				 struct pingu_route *route,
-				 int iface_index, int table)
+				 int table)
 {
-	return netlink_route_modify(fd, RTM_NEWROUTE, route, iface_index, table);
+	return netlink_route_modify(fd, RTM_NEWROUTE, route, table);
 }
 
 int netlink_route_delete(struct netlink_fd *fd,
 			 struct pingu_route *route,
-			 int iface_index, int table)
+			 int table)
 {
-	return netlink_route_modify(fd, RTM_DELROUTE, route, iface_index, table);
+	return netlink_route_modify(fd, RTM_DELROUTE, route, table);
 }
 
 static void netlink_route_flush(struct netlink_fd *fd, struct pingu_iface *iface)
@@ -456,7 +461,7 @@ static void netlink_route_flush(struct netlink_fd *fd, struct pingu_iface *iface
 	struct pingu_route *gw;
 	int err;
 	list_for_each_entry(gw, &iface->route_list, route_list_entry) {
-		err = netlink_route_delete(fd, gw, iface->index, iface->route_table);
+		err = netlink_route_delete(fd, gw, iface->route_table);
 		if (err > 0)
 			log_error("%s: Failed to clean up route in table %i: ",
 				  iface->name, iface->route_table, strerror(err));
@@ -492,7 +497,7 @@ int netlink_rule_modify(struct netlink_fd *fd,
 	if (iface->rule_priority != 0)
 		netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_PRIORITY,
 				     &iface->rule_priority, 4);
-	
+
 	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
 		return -1;
 
@@ -619,6 +624,7 @@ static struct pingu_route *gw_from_rtmsg(struct pingu_route *gw,
 	gw->protocol = rtm->rtm_protocol;
 	gw->scope = rtm->rtm_scope;
 	gw->type = rtm->rtm_type;
+	gw->dev_index = *(int*)RTA_DATA(rta[RTA_OIF]);
 
 	if (rta[RTA_SRC] != NULL)
 		sockaddr_init(&gw->src, rtm->rtm_family, RTA_DATA(rta[RTA_SRC]));
@@ -634,20 +640,39 @@ static struct pingu_route *gw_from_rtmsg(struct pingu_route *gw,
 	return gw;
 }
 
-static void log_route_change(struct pingu_route *route,
-			     char *ifname, int table, int action)
+static void log_route_change(struct pingu_route *route, int table,
+			     int action)
 {
 	char deststr[64] = "", gwstr[64] = "", viastr[68] = "";
+	char ifname[IF_NAMESIZE];
 	char *actionstr = "New";
 	if (action == RTM_DELROUTE)
 		actionstr = "Delete";
 
+	if_indextoname(route->dev_index, ifname);
 	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
 	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
 	if (gwstr[0] != '\0')
 		snprintf(viastr, sizeof(viastr), "via %s ", gwstr);
 	log_info("%s route to %s/%i %sdev %s table %i", actionstr,
 		  deststr, route->dst_len, viastr, ifname, table);
+}
+
+void route_changed_for_iface(struct pingu_iface *iface,
+			     struct pingu_route *route, int action)
+{
+	int err = 0;
+	log_route_change(route, iface->route_table, action);
+	/* Kernel will remove the alternate route when we lose the
+	 * address so we don't need try remove it ourselves */
+	if (action != RTM_DELROUTE || iface->has_address)
+		err = netlink_route_modify(&talk_fd, action, route,
+					   iface->route_table);
+	if (err > 0)
+		log_error("Failed to %s route to table %i",
+			  action == RTM_NEWROUTE ? "add" : "delete",
+			  iface->route_table);
+	pingu_iface_gw_action(iface, route, action);
 }
 
 static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
@@ -657,7 +682,6 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 	struct rtattr *rta[RTA_MAX+1];
 
 	struct pingu_route route;
-	int err = 0;
 
 	/* ignore route changes that we made ourselves via talk_fd */
 	if (msg->nlmsg_pid == getpid())
@@ -669,21 +693,11 @@ static void netlink_route_cb_action(struct nlmsghdr *msg, int action)
 		return;
 
 	gw_from_rtmsg(&route, rtm, rta);
-	iface = pingu_iface_get_by_index(*(int*)RTA_DATA(rta[RTA_OIF]));
+	iface = pingu_iface_get_by_index(route.dev_index);
 	if (iface == NULL)
 		return;
 
-	log_route_change(&route, iface->name, iface->route_table, action);
-	/* Kernel will remove the alternate route when we lose the
-	 * address so we don't need try remove it ourselves */
-	if (action != RTM_DELROUTE || iface->has_address)
-		err = netlink_route_modify(&talk_fd, action, &route,
-					   iface->index, iface->route_table);
-	if (err > 0)
-		log_error("Failed to %s route to table %i",
-			  action == RTM_NEWROUTE ? "add" : "delete",
-			  iface->route_table);
-	pingu_iface_gw_action(iface, &route, action);
+	route_changed_for_iface(iface, &route, action);
 }
 
 static void netlink_route_new_cb(struct nlmsghdr *msg)
@@ -768,10 +782,10 @@ error:
 
 
 int kernel_route_modify(int action, struct pingu_route *route,
-			struct pingu_iface *iface, int table)
+			int table)
 {
-	log_route_change(route, iface->name, table, action);
-	return netlink_route_modify(&talk_fd, action, route, iface->index, table);
+	log_route_change(route, table, action);
+	return netlink_route_modify(&talk_fd, action, route, table);
 }
 
 int kernel_route_multipath(int action, struct list_head *iface_list, int table)

@@ -6,8 +6,11 @@
 
 int kernel_init(struct ev_loop *loop);
 int kernel_route_modify(int action, struct pingu_route *route,
-			struct pingu_iface *iface, int table);
-int kernel_route_multipath(int action, struct list_head *iface_list, int table);
+			int table);
+void route_changed_for_iface(struct pingu_iface *iface,
+			     struct pingu_route *route, int action);
+int kernel_route_multipath(int action, struct list_head *iface_list,
+			   int table);
 void kernel_cleanup_iface_routes(struct pingu_iface *iface);
 void kernel_close(void);
 

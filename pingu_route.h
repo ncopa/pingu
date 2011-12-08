@@ -12,6 +12,7 @@ struct pingu_route {
 	unsigned char src_len;
 
 	int metric;
+	int dev_index;
 	unsigned char protocol;
 	unsigned char scope;
 	unsigned char type;

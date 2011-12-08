@@ -181,7 +181,7 @@ void pingu_iface_update_routes(struct pingu_iface *iface, int action)
 	struct pingu_route *route;
 	list_for_each_entry(route, &iface->route_list, route_list_entry) {
 		if (is_default_gw(route) && iface->has_address)
-			kernel_route_modify(action, route, iface, RT_TABLE_MAIN);
+			kernel_route_modify(action, route, RT_TABLE_MAIN);
 	}
 	if (load_balanced > 1)
 		kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
