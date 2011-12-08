@@ -29,6 +29,7 @@ struct pingu_iface {
 	int fd;
 	union sockaddr_any primary_addr;
 	int route_table;
+	int rule_priority;
 	struct list_head iface_list_entry;
 	struct list_head ping_list;
 	struct list_head route_list;

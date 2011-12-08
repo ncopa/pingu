@@ -471,7 +471,6 @@ int netlink_rule_modify(struct netlink_fd *fd,
 		struct rtmsg	msg;
 		char buf[1024];
 	} req;
-	char buf[64];
 
 	memset(&req, 0, sizeof(req));
 
@@ -490,8 +489,10 @@ int netlink_rule_modify(struct netlink_fd *fd,
 	req.msg.rtm_src_len = 32;
 	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), FRA_SRC,
 				    &iface->primary_addr);
-	sockaddr_to_string(&iface->primary_addr, buf, sizeof(buf));
-
+	if (iface->rule_priority != 0)
+		netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_PRIORITY,
+				     &iface->rule_priority, 4);
+	
 	if (!netlink_talk(fd, &req.nlh, sizeof(req), &req.nlh))
 		return -1;
 

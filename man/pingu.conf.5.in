@@ -60,6 +60,8 @@ The minimum number of ping hosts that needs to be online to consider the
 gateway online.
 .It Cd route-table
 The alternate route table for this interface.
+.It Cd rule-priority
+The preference value for the ip rule.
 .El
 
 .Sh HOST CONTEXT
