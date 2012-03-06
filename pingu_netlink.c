@@ -644,18 +644,20 @@ static void log_route_change(struct pingu_route *route, int table,
 			     int action)
 {
 	char deststr[64] = "", gwstr[64] = "", viastr[68] = "";
-	char ifname[IF_NAMESIZE];
+	char ifname[IF_NAMESIZE] = "";
+	char devstr[IF_NAMESIZE + 5] = "";
 	char *actionstr = "New";
 	if (action == RTM_DELROUTE)
 		actionstr = "Delete";
 
-	if_indextoname(route->dev_index, ifname);
+	if (if_indextoname(route->dev_index, ifname) != NULL)
+		snprintf(devstr, sizeof(devstr), "dev %s ", ifname);
 	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
 	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
 	if (gwstr[0] != '\0')
 		snprintf(viastr, sizeof(viastr), "via %s ", gwstr);
-	log_info("%s route to %s/%i %sdev %s table %i", actionstr,
-		  deststr, route->dst_len, viastr, ifname, table);
+	log_info("%s route to %s/%i %s%stable %i", actionstr,
+		  deststr, route->dst_len, viastr, devstr, table);
 }
 
 void route_changed_for_iface(struct pingu_iface *iface,
