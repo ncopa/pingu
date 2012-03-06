@@ -115,7 +115,7 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 	struct pingu_iface *iface;
 	char *key, *value;
 
-	iface = pingu_iface_get_by_name(value);
+	iface = pingu_iface_get_by_name(ifname);
 	if (iface != NULL) {
 		log_error("Interface %s already declared (line %i)", conf->lineno);
 		return -1;
