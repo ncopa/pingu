@@ -127,3 +127,11 @@ void pingu_ping_read_reply(struct ev_loop *loop, struct pingu_iface *iface)
 	pingu_ping_handle_reply(loop, ping);
 }
 
+void pingu_ping_cleanup(struct list_head *ping_list)
+{
+	struct pingu_ping *ping, *n;
+	list_for_each_entry_safe(ping, n, ping_list, ping_list_entry) {
+		list_del(&ping->ping_list_entry);
+		free(ping);
+	}
+}

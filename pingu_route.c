@@ -126,3 +126,12 @@ struct pingu_route *pingu_route_first_default(struct list_head *route_list)
 	}
 	return NULL;
 }
+
+void pingu_route_cleanup(struct list_head *route_list)
+{
+	struct pingu_route *entry, *n;
+	list_for_each_entry_safe(entry, n, route_list, route_list_entry) {
+		list_del(&entry->route_list_entry);
+		free(entry);
+	}
+}

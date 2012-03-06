@@ -139,3 +139,19 @@ int pingu_host_init(struct ev_loop *loop)
 	return 0;
 }
 
+void pingu_host_cleanup(void)
+{
+	struct pingu_host *host, *n;
+	list_for_each_entry_safe(host, n, &host_list, host_list_entry) {
+		if (host->host != NULL)
+			free(host->host);
+		if (host->label != NULL)
+			free(host->label);
+		if (host->up_action != NULL)
+			free((void *)host->up_action);
+		if (host->down_action != NULL)
+			free((void *)host->down_action);
+		list_del(&host->host_list_entry);
+		free(host);
+	}
+}

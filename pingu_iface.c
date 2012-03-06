@@ -274,7 +274,7 @@ int pingu_iface_init(struct ev_loop *loop)
 
 void pingu_iface_cleanup(void)
 {
-	struct pingu_iface *iface;
+	struct pingu_iface *iface, *n;
 	/* remove loadbalance route */
 	if (load_balanced > 1) {
 		int err = kernel_route_multipath(RTM_DELROUTE, &iface_list, RT_TABLE_MAIN);
@@ -285,5 +285,17 @@ void pingu_iface_cleanup(void)
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
 		kernel_cleanup_iface_routes(iface);
 		close(iface->fd);
+	}
+	list_for_each_entry_safe(iface, n, &iface_list, iface_list_entry) {
+		list_del(&iface->iface_list_entry);
+		if (iface->label != NULL)
+			free(iface->label);
+		if (iface->gw_up_action != NULL)
+			free(iface->gw_up_action);
+		if (iface->gw_down_action != NULL)
+			free(iface->gw_down_action);
+		pingu_ping_cleanup(&iface->ping_list);
+		pingu_route_cleanup(&iface->route_list);
+		free(iface);
 	}
 }
