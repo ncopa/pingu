@@ -15,7 +15,7 @@
 void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 {
 	struct addrinfo hints;
-	struct addrinfo *ai, *rp;
+	struct addrinfo *ai = NULL, *rp;
 	int r;
 	char buf[64];
 
