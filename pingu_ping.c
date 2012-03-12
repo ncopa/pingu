@@ -29,15 +29,21 @@ static int pingu_ping_get_seq(void)
 	return seq;
 }
 
+static void pingu_ping_free(struct ev_loop *loop, struct pingu_ping *ping)
+{
+	list_del(&ping->ping_list_entry);
+	ev_timer_stop(loop, &ping->timeout_watcher);
+	pingu_host_verify_status(loop, ping->host);
+	free(ping);
+}
+
 static void pingu_ping_timeout_cb(struct ev_loop *loop, ev_timer *w,
 				  int revents)
 {
 	struct pingu_ping *ping = container_of(w, struct pingu_ping, timeout_watcher);
 	log_debug("%s: seq %i (%i/%i) timed out", ping->host->label, ping->seq,
 		ping->host->burst.pings_sent, ping->host->max_retries);
-	list_del(&ping->ping_list_entry);
-	pingu_host_verify_status(loop, ping->host);
-	free(ping);
+	pingu_ping_free(loop, ping);
 }
 
 static struct pingu_ping *pingu_ping_add(struct ev_loop *loop,
@@ -79,10 +85,7 @@ static void pingu_ping_handle_reply(struct ev_loop *loop,
 	log_debug("%s: got seq %i (%i/%i)", ping->host->label, ping->seq,
 		  ping->host->burst.pings_replied,
 		  ping->host->required_replies);
-	list_del(&ping->ping_list_entry);
-	ev_timer_stop(loop, &ping->timeout_watcher);
-	pingu_host_verify_status(loop, ping->host);
-	free(ping);
+	pingu_ping_free(loop, ping);
 }
 
 int pingu_ping_send(struct ev_loop *loop, struct pingu_host *host,
