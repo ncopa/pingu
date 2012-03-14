@@ -1,4 +1,7 @@
 
+#include <net/if.h>
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,14 +42,29 @@ static struct pingu_route *pingu_route_clone(struct pingu_route *gw)
 	return new_gw;
 }
 
+char *pingu_route_to_string(struct pingu_route *route,
+			    char *buf, size_t bufsize)
+{
+	char deststr[64] = "", gwstr[64] = "", viastr[68] = "";
+	char ifname[IF_NAMESIZE] = "", devstr[IF_NAMESIZE + 5] = "";
+
+	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
+	sockaddr_to_string(&route->gw_addr, gwstr, sizeof(gwstr));
+	if (gwstr[0] != '\0')
+		snprintf(viastr, sizeof(viastr), "via %s ", gwstr);
+	if (if_indextoname(route->dev_index, ifname) != NULL)
+		snprintf(devstr, sizeof(devstr), "dev %s ", ifname);
+		
+	snprintf(buf, bufsize, "%s/%i %s%smetric %i", deststr,
+		 route->dst_len, viastr, devstr, route->metric);
+	return buf;
+}
+
 static void log_debug_gw(char *msg, struct pingu_route *gw)
 {
-	char destbuf[64], gwaddrbuf[64];
-	log_debug("%s: %s/%i via %s metric %i", msg,
-		  sockaddr_to_string(&gw->dest, destbuf, sizeof(destbuf)),
-		  gw->dst_len,
-		  sockaddr_to_string(&gw->gw_addr, gwaddrbuf, sizeof(gwaddrbuf)),
-		  gw->metric);
+	char routestr[512] = "";
+	log_debug("%s: %s", msg,
+		  pingu_route_to_string(gw, routestr, sizeof(routestr)));
 }
 
 static int gateway_cmp(struct pingu_route *a, struct pingu_route *b)

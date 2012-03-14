@@ -19,6 +19,8 @@ struct pingu_route {
 	struct list_head route_list_entry;
 };
 
+char *pingu_route_to_string(struct pingu_route *route,
+			    char *buf, size_t bufsize);
 void pingu_route_del_all(struct list_head *head);
 void pingu_route_add(struct list_head *route_list,
 			     struct pingu_route *gw);
