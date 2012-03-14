@@ -4,6 +4,12 @@ SBIN_TARGETS = pingu pinguctl
 LUA_TARGETS = client.so
 TARGETS = $(BIN_TARGETS) $(SBIN_TARGETS) $(LUA_TARGETS)
 VERSION = 1.0
+PINGU_VERSION := $(shell \
+	if [ -d .git ]; then \
+		git describe --long; \
+	else \
+		echo $(VERSION); \
+	fi)
 
 prefix = /usr
 localstatedir = /var
@@ -24,7 +30,7 @@ PKG_CONFIG ?= pkg-config
 SUBDIRS := man
 
 CFLAGS ?= -g
-CFLAGS += -DPINGU_VERSION=\"$(VERSION)\"
+CFLAGS += -DPINGU_VERSION=\"$(PINGU_VERSION)\"
 CFLAGS += -Wall -Wstrict-prototypes -D_GNU_SOURCE -std=gnu99
 CFLAGS += -DDEFAULT_PIDFILE=\"$(pingustatedir)/pingu.pid\"
 CFLAGS += -DDEFAULT_ADM_client=\"$(pingustatedir)/pingu.ctl\"
