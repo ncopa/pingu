@@ -27,12 +27,13 @@ struct adm_conn {
 
 static void pingu_adm_free_conn(struct ev_loop *loop, struct adm_conn *rm)
 {
-        int fd = rm->io.fd;
+	int fd = rm->io.fd;
 
-        ev_io_stop(loop, &rm->io);
-        ev_timer_stop(loop, &rm->timeout);
-        close(fd);
-        free(rm);
+	ev_io_stop(loop, &rm->io);
+	ev_timer_stop(loop, &rm->timeout);
+	close(fd);
+	free(rm);
+	log_debug("Admin connection closed");
 }
 
 static struct {
@@ -84,8 +85,6 @@ static void pingu_adm_recv_cb (struct ev_loop *loop, struct ev_io *w,
 
 	if (adm_handler[i].command == NULL)
 		log_error("%s: unknown admim command", conn->cmd);
-
-	return;
 
 err:
 	pingu_adm_free_conn(loop, conn);

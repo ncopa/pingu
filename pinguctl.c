@@ -48,12 +48,16 @@ static int adm_send_cmd(int fd, const char *cmd)
 static int adm_recv(int fd)
 {
 	char buf[1024];
-	int n;
+	int n, total = 0;
 
-	n = recv(fd, buf, sizeof(buf), 0);
-	if (n > 0)
+	while (1) {
+		n = recv(fd, buf, sizeof(buf), 0);
+		if (n <= 0)
+			break;
 		write(STDOUT_FILENO, buf, n);
-	return n;
+		total += n;
+	}
+	return total;
 }
 
 int main(int argc, char *argv[])
