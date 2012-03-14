@@ -272,7 +272,7 @@ int pingu_iface_init(struct ev_loop *loop)
 	return 0;
 }
 
-void pingu_iface_cleanup(void)
+void pingu_iface_cleanup(struct ev_loop *loop)
 {
 	struct pingu_iface *iface, *n;
 	/* remove loadbalance route */
@@ -294,7 +294,7 @@ void pingu_iface_cleanup(void)
 			free(iface->gw_up_action);
 		if (iface->gw_down_action != NULL)
 			free(iface->gw_down_action);
-		pingu_ping_cleanup(&iface->ping_list);
+		pingu_ping_cleanup(loop, &iface->ping_list);
 		pingu_route_cleanup(&iface->route_list);
 		free(iface);
 	}

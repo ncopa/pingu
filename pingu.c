@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
 
 	ev_run(loop, 0);
 	log_info("Shutting down");
-	pingu_iface_cleanup();
+	pingu_iface_cleanup(loop);
 	pingu_host_cleanup();
 	kernel_close();
 	ev_loop_destroy(loop);
