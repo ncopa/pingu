@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
@@ -7,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <ev.h>
@@ -74,7 +76,7 @@ static struct pingu_ping *pingu_ping_find(struct icmphdr *icp,
 	struct pingu_ping *ping;
 	if (icp->type != ICMP_ECHOREPLY || icp->un.echo.id != getpid())
 		return NULL;
-	
+
 	list_for_each_entry(ping, ping_list, ping_list_entry) {
 		if (sockaddr_cmp(&ping->host->burst.saddr, from) == 0
 		    && ping->seq == ntohs(icp->un.echo.sequence))
@@ -140,5 +142,16 @@ void pingu_ping_cleanup(struct ev_loop *loop, struct list_head *ping_list)
 	struct pingu_ping *ping, *n;
 	list_for_each_entry_safe(ping, n, ping_list, ping_list_entry) {
 		pingu_ping_free(loop, ping);
+	}
+}
+
+void pingu_ping_dump(int fd, struct list_head *ping_list, const char *prefix)
+{
+	struct pingu_ping *ping;
+	char str[IF_NAMESIZE + 80];
+	list_for_each_entry(ping, ping_list, ping_list_entry) {
+		snprintf(str, sizeof(str), "%s %s %i\n",
+			 prefix, ping->host->host, ping->seq);
+		write(fd, str, strlen(str));
 	}
 }

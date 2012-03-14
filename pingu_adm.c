@@ -41,6 +41,7 @@ static struct {
 } adm_handler[] = {
 	{ "host-status",	pingu_host_dump_status },
 	{ "gateway-status",	pingu_iface_dump_status },
+	{ "pings",		pingu_iface_dump_pings },
 	{ NULL,			NULL }
 };
 	
@@ -74,7 +75,7 @@ static void pingu_adm_recv_cb (struct ev_loop *loop, struct ev_io *w,
 	for (i = 0; adm_handler[i].command != NULL; i++) {
 		if (strncmp(conn->cmd, adm_handler[i].command, len) != 0)
 			continue;
-		log_debug("Admin command: %s", conn->cmd);
+		log_debug("Admin command: %s (args='%s')", conn->cmd, args ? args : "NULL");
 		adm_handler[i].handler(conn->io.fd, args);
 		conn->cmd[0] = '\0';
 		conn->num_read = 0;

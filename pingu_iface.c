@@ -213,8 +213,8 @@ void pingu_iface_adjust_hosts_online(struct pingu_iface *iface, int adjustment)
 		statusstr = "OFFLINE";
 		route_action = RTM_DELROUTE;
 		action = iface->gw_down_action;
-	}	
-	
+	}
+
 	log_info("%s: went %s", iface->label ? iface->label : iface->name,
 		 statusstr);
 	pingu_iface_update_routes(iface, route_action);
@@ -255,7 +255,18 @@ void pingu_iface_dump_status(int fd, char *filter)
 			 pingu_iface_gw_is_online(iface));
 		write(fd, buf, strlen(buf));
 	}
-	write(fd, "\n", 1);	
+	write(fd, "\n", 1);
+}
+
+void pingu_iface_dump_pings(int fd, char *filter)
+{
+	struct pingu_iface *iface;
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (filter != NULL && strcmp(filter, iface->name) != 0)
+			continue;
+		pingu_ping_dump(fd, &iface->ping_list, iface->name);
+	}
+	write(fd, "\n", 1);
 }
 
 int pingu_iface_init(struct ev_loop *loop)
