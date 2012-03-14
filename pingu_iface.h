@@ -55,6 +55,7 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 
 void pingu_iface_dump_status(int fd, char *filter);
 void pingu_iface_dump_pings(int fd, char *filter);
+void pingu_iface_dump_routes(int fd, char *filter);
 void pingu_iface_update_routes(struct pingu_iface *iface, int action);
 void pingu_iface_cleanup(struct ev_loop *loop);
 #endif

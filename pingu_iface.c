@@ -269,6 +269,17 @@ void pingu_iface_dump_pings(int fd, char *filter)
 	write(fd, "\n", 1);
 }
 
+void pingu_iface_dump_routes(int fd, char *filter)
+{
+	struct pingu_iface *iface;
+	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		if (filter != NULL && strcmp(filter, iface->name) != 0)
+			continue;
+		pingu_route_dump(fd, &iface->route_list);
+	}
+	write(fd, "\n", 1);
+}
+
 int pingu_iface_init(struct ev_loop *loop)
 {
 	struct pingu_iface *iface;

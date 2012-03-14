@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "list.h"
 #include "log.h"
@@ -143,6 +144,19 @@ struct pingu_route *pingu_route_first_default(struct list_head *route_list)
 			return entry;
 	}
 	return NULL;
+}
+
+void pingu_route_dump(int fd, struct list_head *route_list)
+{
+	struct pingu_route *entry;
+	list_for_each_entry(entry, route_list, route_list_entry) {
+		char str[512] = "";
+		pingu_route_to_string(entry, str, sizeof(str));
+		if (str[0] != '\0') {
+			strncat(str, "\n", sizeof(str));
+			write(fd, str, strlen(str));
+		}
+	}
 }
 
 void pingu_route_cleanup(struct list_head *route_list)

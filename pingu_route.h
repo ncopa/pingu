@@ -28,6 +28,7 @@ void pingu_route_del(struct list_head *route_list,
 			     struct pingu_route *gw);
 int is_default_gw(struct pingu_route *route);
 struct pingu_route *pingu_route_first_default(struct list_head *route_list);
+void pingu_route_dump(int fd, struct list_head *route_list);
 void pingu_route_cleanup(struct list_head *route_list);
 
 #endif

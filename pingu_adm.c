@@ -43,6 +43,7 @@ static struct {
 	{ "host-status",	pingu_host_dump_status },
 	{ "gateway-status",	pingu_iface_dump_status },
 	{ "pings",		pingu_iface_dump_pings },
+	{ "routes",		pingu_iface_dump_routes },
 	{ NULL,			NULL }
 };
 	
