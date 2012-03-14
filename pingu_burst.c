@@ -50,6 +50,7 @@ void ping_burst_start(struct ev_loop *loop, struct pingu_host *host)
 		log_debug("%s: failed to send first ping to %s", host->label, buf);
 		host->burst.active = 0;
 	}
+	freeaddrinfo(ai);
 }
 
 void pingu_burst_timeout_cb(struct ev_loop *loop, struct ev_timer *w,
