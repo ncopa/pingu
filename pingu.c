@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -120,6 +121,22 @@ static void sigint_cb(struct ev_loop *loop, ev_signal *w, int revents)
 	ev_break(loop, EVBREAK_ALL);
 }
 
+static pid_t get_running_pid(void) {
+	size_t n;
+	int fd;
+	char buf[32] = "/proc/";
+	fd = open(pid_file, O_RDONLY);
+	if (fd < 0)
+		return 0;
+	n = read(fd, &buf[6], sizeof(buf)-7);
+	close(fd);
+	if (n < sizeof(buf)-6)
+		buf[5+n] = '\0'; /* chomp newline */
+	if (access(buf, R_OK) == 0)
+		return atoi(&buf[6]);
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	int c;
@@ -128,6 +145,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 	static struct ev_loop *loop;
 	static struct ev_signal signal_watcher;
+	pid_t pid;
 
 	while ((c = getopt(argc, argv, "a:c:dhp:Vv")) != -1) {
 		switch (c) {
@@ -158,6 +176,11 @@ int main(int argc, char *argv[])
 	argv += optind;
 
 	log_init("pingu", verbose);
+
+	pid = get_running_pid();
+	if (pid)
+		errx(1, "appears to be running already (pid %i)", pid);
+
 	loop = ev_default_loop(0);
 
 	if (pingu_conf_parse(config_file) < 0)
