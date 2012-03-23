@@ -166,6 +166,19 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 	case RTM_NEWROUTE:
 		pingu_route_add(&iface->route_list, gw);
 		log_debug("%s: added route", iface->name);
+		/* if we get a new default gateway for an interface
+		 * that is marked "down", remove the default gw again
+		 * from main table and let pingu detect that it went up
+		 *
+		 * This solves the case when dhcp will renew a lease,
+		 * recreates the default gw and ISP is broke a bit
+		 * futher down the road.
+		 */
+		if (is_default_gw(gw) && !pingu_iface_gw_is_online(iface)) {
+			pingu_iface_update_routes(iface, RTM_DELROUTE);
+			/* avoid doing the multipath twice*/
+			return;
+		}
 		break;
 	case RTM_DELROUTE:
 		pingu_route_del(&iface->route_list, gw);
