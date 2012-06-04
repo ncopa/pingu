@@ -42,6 +42,7 @@ static int do_ping(int seq, int size)
 		icmp_send_ping(fd, (struct sockaddr *) &to, sizeof(to),
 			       seq, size);
 
+not_mine:
 		if ((len = icmp_read_reply(fd, (struct sockaddr *) &from,
 					   sizeof(from), buf, sizeof(buf))) <= 0)
 			continue;
@@ -49,7 +50,7 @@ static int do_ping(int seq, int size)
 		if (icmp_parse_reply(buf, len, seq,
 				     (struct sockaddr *) &from,
 				     (struct sockaddr *) &to))
-			return -1;
+			goto not_mine;
 
 		icp = (struct icmphdr *) &buf[ip->ihl * 4];
 		switch (icp->type) {
