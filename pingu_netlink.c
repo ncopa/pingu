@@ -560,6 +560,7 @@ static void netlink_link_del_cb(struct nlmsghdr *msg)
 	log_info("Interface '%s' deleted", ifname);
 	iface->index = 0;
 	iface->has_link = 0;
+	pingu_host_iface_deleted(iface);
 }
 
 static void netlink_addr_new_cb(struct nlmsghdr *msg)

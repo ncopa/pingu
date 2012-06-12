@@ -139,6 +139,14 @@ int pingu_host_init(struct ev_loop *loop)
 	return 0;
 }
 
+void pingu_host_iface_deleted(struct pingu_iface *iface)
+{
+	struct pingu_host *host;
+	list_for_each_entry(host, &host_list, host_list_entry)
+		if (host->iface == iface)
+			pingu_host_set_status(host, 0);
+}
+
 void pingu_host_cleanup(void)
 {
 	struct pingu_host *host, *n;
