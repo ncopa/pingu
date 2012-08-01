@@ -126,8 +126,7 @@ int is_default_gw(struct pingu_route *route)
 {
 	switch (route->dest.sa.sa_family) {
 	case AF_INET:
-		return ((route->dest.sin.sin_addr.s_addr == 0) 
-			 && (route->gw_addr.sin.sin_addr.s_addr != 0));
+		return (route->dest.sin.sin_addr.s_addr == 0);
 		break;
 	case AF_INET6:
 		log_debug("TODO: ipv6");

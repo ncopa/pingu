@@ -138,7 +138,7 @@ static int netlink_add_subrtattr_l(struct rtattr *rta, int maxlen, int type,
         subrta->rta_len = len;
         memcpy(RTA_DATA(subrta), data, alen);
         rta->rta_len = NLMSG_ALIGN(rta->rta_len) + RTA_ALIGN(len);
-        return TRUE;
+        return alen;
 }
 
 static int netlink_add_subrtattr_addr_any(struct rtattr *rta, int maxlen,
@@ -346,11 +346,13 @@ static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
 		      struct pingu_iface *iface,
 		      struct pingu_route *route)
 {
+	int addr_size;
 	if (route == NULL)
 		return 0;
-	netlink_add_subrtattr_addr_any(rta, 1024, RTA_GATEWAY,
-					&route->gw_addr);
-	rtnh->rtnh_len += sizeof(struct rtattr) + 4; // TODO: support ipv6
+	addr_size = netlink_add_subrtattr_addr_any(rta, 1024, RTA_GATEWAY,
+						&route->gw_addr);
+	if (addr_size > 0)
+		rtnh->rtnh_len += sizeof(struct rtattr) + addr_size;
 	if (iface->balance_weight)
 		rtnh->rtnh_hops = iface->balance_weight - 1;
 	rtnh->rtnh_ifindex = iface->index;
