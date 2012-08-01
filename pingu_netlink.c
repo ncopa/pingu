@@ -347,12 +347,17 @@ static int add_one_nh(struct rtattr *rta, struct rtnexthop *rtnh,
 		      struct pingu_route *route)
 {
 	int addr_size;
+	char addrbuf[40] = "";
 	if (route == NULL)
 		return 0;
 	addr_size = netlink_add_subrtattr_addr_any(rta, 1024, RTA_GATEWAY,
 						&route->gw_addr);
 	if (addr_size > 0)
 		rtnh->rtnh_len += sizeof(struct rtattr) + addr_size;
+	log_debug("adding nexthop%s%s dev %s",
+		  route->gw_addr.sa.sa_family ? " via " : "",
+		  sockaddr_to_string(&route->gw_addr, addrbuf, sizeof(addrbuf)),
+		  iface->name);
 	if (iface->balance_weight)
 		rtnh->rtnh_hops = iface->balance_weight - 1;
 	rtnh->rtnh_ifindex = iface->index;
