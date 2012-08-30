@@ -62,6 +62,9 @@ gateway online.
 The alternate route table for this interface.
 .It Cd rule-priority
 The preference value for the ip rule.
+.It Cd ping
+Host to ping to verify that gateway is still up. This is the same as defining
+a host and bind it to interface.
 .El
 
 .Sh HOST CONTEXT

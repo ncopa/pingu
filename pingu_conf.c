@@ -110,6 +110,14 @@ static char *pingu_conf_read_key_value(struct pingu_conf *conf, char **key,
 	return line;
 }
 
+static struct pingu_host *pingu_conf_new_host(const char *hoststr)
+{
+	return pingu_host_new(xstrdup(hoststr), default_burst_interval,
+			      default_max_retries, default_required_replies,
+			      default_timeout, default_up_action,
+			      default_down_action);
+}
+
 static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 {
 	struct pingu_iface *iface;
@@ -151,6 +159,9 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 				}
 			}
 			pingu_iface_set_balance(iface, weight);
+		} else if (strcmp(key, "ping") == 0) {
+			struct pingu_host *host = pingu_conf_new_host(value);
+			host->iface = iface;
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  conf->lineno);
@@ -162,12 +173,8 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 {
 	char *key, *value;
-	struct pingu_host *host;
+	struct pingu_host *host = pingu_conf_new_host(hoststr);
 
-	host = pingu_host_new(xstrdup(hoststr), default_burst_interval,
-			      default_max_retries, default_required_replies,
-			      default_timeout, default_up_action,
-			      default_down_action);
 	while (pingu_conf_read_key_value(conf, &key, &value)) {
 		if (key == NULL || key[0] == '}')
 			break;
