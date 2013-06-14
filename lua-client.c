@@ -14,6 +14,10 @@
 
 #define LIBNAME "pingu.client"
 
+#if LUA_VERSION_NUM < 502
+#  define luaL_newlib(L,l) (lua_newtable(L), luaL_register(L,NULL,l))
+#endif
+
 static int pusherror(lua_State *L, const char *info)
 {
 	lua_pushnil(L);
@@ -61,7 +65,7 @@ close_err:
 	return ret;
 }
 
-static const luaL_reg reg_pingu_methods[] = {
+static const luaL_Reg reg_pingu_methods[] = {
 	{"open",	Padm_open},
 	{NULL,	NULL},
 };
@@ -69,7 +73,7 @@ static const luaL_reg reg_pingu_methods[] = {
 
 LUALIB_API int luaopen_pingu_client(lua_State *L)
 {
-	luaL_register(L, LIBNAME, reg_pingu_methods);
+	luaL_newlib(L, reg_pingu_methods);
 	lua_pushliteral(L, "version");
 	lua_pushliteral(L, PINGU_VERSION);
 	lua_settable(L, -3);
