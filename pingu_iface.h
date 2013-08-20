@@ -17,7 +17,7 @@ struct pingu_iface {
 	char *gw_down_action;
 	int hosts_online;
 	int required_hosts_online;
-	
+
 	int index;
 	int has_link;
 	int has_address;
@@ -30,6 +30,7 @@ struct pingu_iface {
 	union sockaddr_any primary_addr;
 	int route_table;
 	int rule_priority;
+	int fwmark;
 	struct list_head iface_list_entry;
 	struct list_head ping_list;
 	struct list_head route_list;

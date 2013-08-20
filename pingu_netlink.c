@@ -476,7 +476,7 @@ static void netlink_route_flush(struct netlink_fd *fd, struct pingu_iface *iface
 }
 
 int netlink_rule_modify(struct netlink_fd *fd,
-	struct pingu_iface *iface, int type)
+	struct pingu_iface *iface, int rtm_type, int rule_type)
 {
 	struct {
 		struct nlmsghdr	nlh;
@@ -488,8 +488,8 @@ int netlink_rule_modify(struct netlink_fd *fd,
 
 	req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-	req.nlh.nlmsg_type = type;
-	if (type == RTM_NEWRULE)
+	req.nlh.nlmsg_type = rtm_type;
+	if (rtm_type == RTM_NEWRULE)
 		req.nlh.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
 
 	req.msg.rtm_family = AF_INET;
@@ -498,9 +498,21 @@ int netlink_rule_modify(struct netlink_fd *fd,
 	req.msg.rtm_scope = RT_SCOPE_UNIVERSE;
 	req.msg.rtm_type = RTN_UNICAST;
 
-	req.msg.rtm_src_len = 32;
-	netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), FRA_SRC,
-				    &iface->primary_addr);
+	switch (rule_type) {
+	case FRA_SRC:
+		req.msg.rtm_src_len = 32;
+		netlink_add_rtattr_addr_any(&req.nlh, sizeof(req), FRA_SRC,
+					    &iface->primary_addr);
+		break;
+	case FRA_FWMARK:
+		netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_FWMARK,
+				     &iface->fwmark, 4);
+		break;
+	default:
+		log_error("%s: unsupported route rule. Should not happen.",
+			  iface->name);
+	}
+
 	if (iface->rule_priority != 0)
 		netlink_add_rtattr_l(&req.nlh, sizeof(req), FRA_PRIORITY,
 				     &iface->rule_priority, 4);
@@ -513,13 +525,17 @@ int netlink_rule_modify(struct netlink_fd *fd,
 
 int netlink_rule_del(struct netlink_fd *fd,	struct pingu_iface *iface)
 {
-	return netlink_rule_modify(fd, iface, RTM_DELRULE);
+	if (iface->fwmark)
+		netlink_rule_modify(fd, iface, RTM_DELRULE, FRA_FWMARK);
+	return netlink_rule_modify(fd, iface, RTM_DELRULE, FRA_SRC);
 }
 
 int netlink_rule_replace_or_add(struct netlink_fd *fd, struct pingu_iface *iface)
 {
 	netlink_rule_del(fd, iface);
-	return netlink_rule_modify(fd, iface, RTM_NEWRULE);
+	if (iface->fwmark)
+		netlink_rule_modify(fd, iface, RTM_NEWRULE, FRA_FWMARK);
+	return netlink_rule_modify(fd, iface, RTM_NEWRULE, FRA_SRC);
 }
 
 static void netlink_link_new_cb(struct nlmsghdr *msg)

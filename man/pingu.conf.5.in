@@ -1,4 +1,4 @@
-.Dd October 19, 2011
+.Dd August 20, 2013
 .Dt PINGU.CONF 8 Linux
 .Os
 
@@ -65,6 +65,8 @@ The preference value for the ip rule.
 .It Cd ping
 Host to ping to verify that gateway is still up. This is the same as defining
 a host and bind it to interface.
+.It Cd fwmark
+Add an additional route rule for configured fwmark integer.
 .El
 
 .Sh HOST CONTEXT

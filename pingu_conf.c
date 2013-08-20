@@ -162,6 +162,8 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		} else if (strcmp(key, "ping") == 0) {
 			struct pingu_host *host = pingu_conf_new_host(value);
 			host->iface = iface;
+		} else if (strcmp(key, "fwmark") == 0) {
+			iface->fwmark = atoi(value);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  conf->lineno);
