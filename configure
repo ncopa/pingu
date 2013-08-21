@@ -55,6 +55,9 @@ Optional features:
   --enable-debug          build with debugging information [disabled]
   --enable-warnings       build with recommended warnings flags [enabled]
   --enable-werror         build with -Werror [disabled]
+  --enable-lua            build Lua client binding [disabled]
+  --with-luapc=LUAPC      build Lua client binding, using LUAPC pkg-config
+                          package [disabled]
 
 Some influential environment variables:
   CC                      C compiler command [detected]
@@ -81,6 +84,7 @@ mandir='$(datarootdir)/man'
 enable_debug=false
 enable_warnings=true
 enable_werror=false
+enable_lua=false
 
 for arg; do
 case "$arg" in
@@ -100,6 +104,7 @@ case "$arg" in
 --disable-warnings) enable_warnings=false ;;
 --enable-werror) enable_werror=true ;;
 --disable-werror) enable_werror=false ;;
+--with-luapc=*) with_luapc=${arg#*=};;
 -* ) die "$0: unknown option $arg" ;;
 CC=*) CC=${arg#*=} ;;
 CFLAGS=*) CFLAGS=${arg#*=} ;;
@@ -119,6 +124,14 @@ fi
 
 if $enable_werror; then
 	CFLAGS="$CFLAGS -Werror"
+fi
+
+echo -n "Checking for Lua support: "
+if [ -n "$with_luapc" ]; then
+	LUAPC="$with_luapc"
+	echo $with_luapc
+else
+	echo disabled
 fi
 
 cc=${CC:-gcc}
@@ -176,6 +189,7 @@ localstatedir
 libdir
 datarootdir
 mandir
+LUAPC
 CC
 CFLAGS
 LDFLAGS

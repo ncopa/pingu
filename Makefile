@@ -3,7 +3,7 @@
 
 BIN_TARGETS = mtu
 SBIN_TARGETS = pingu pinguctl
-LUA_TARGETS = client.so
+
 TARGETS = $(BIN_TARGETS) $(SBIN_TARGETS) $(LUA_TARGETS)
 VERSION = 1.2
 PINGU_VERSION := $(shell \
@@ -27,14 +27,22 @@ rundir ?= $(localstatedir)/run
 
 pingustatedir = $(rundir)/pingu
 
-luasharedir = /usr/share/lua/5.1
-lualibdir = /usr/lib/lua/5.1
-
 DESTDIR ?=
 
 INSTALL = install
 INSTALLDIR = $(INSTALL) -d
 PKG_CONFIG ?= pkg-config
+
+ifneq (LUAPC,)
+LUA_TARGETS := client.so
+INSTALL_LUA_TARGET := install-lua
+LUA_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(LUAPC))
+LUA_VERSION ?= $(shell $(PKG_CONFIG) --variable V $(LUAPC))
+
+luasharedir := $(datarootdir)/lua/$(LUA_VERSION)
+lualibdir := $(libdir)/lua/$(LUA_VERSION)
+
+endif
 
 SUBDIRS := man
 
@@ -73,15 +81,18 @@ mtu_OBJS = \
 	netlink.o \
 	icmp.o
 
+lua-client.o_CFLAGS = $(LUA_CFLAGS)
 client.so_OBJS = \
 	lua-client.o
 
-client.so_LIBS = $(shell $(PKG_CONFIG) --libs lua)
 client.so_LDFLAGS = -shared
 
 ALL_OBJS= $(pingu_OBJS) $(pinguctl_OBJS) $(mtu_OBJS) $(client.so_OBJS)
 
 all: $(TARGETS) man
+
+%.o: %.c
+	$(CC) $(CFLAGS) $($@_CFLAGS) -c $<
 
 $(TARGETS):
 	$(CC) $(LDFLAGS) $($@_LDFLAGS) $($@_OBJS) $($@_LIBS) -o $@
@@ -94,7 +105,7 @@ mtu: $(mtu_OBJS)
 $(SUBDIRS):
 	$(MAKE) -C $@
 
-install: $(TARGETS)
+install: $(TARGETS) $(INSTALL_LUA_TARGET)
 	$(INSTALLDIR) $(DESTDIR)/$(bindir) $(DESTDIR)/$(sbindir) \
 		$(DESTDIR)/$(pingustatedir)
 	$(INSTALL) $(BIN_TARGETS) $(DESTDIR)/$(bindir)
