@@ -1,4 +1,6 @@
 
+-include config.mk
+
 BIN_TARGETS = mtu
 SBIN_TARGETS = pingu pinguctl
 LUA_TARGETS = client.so
@@ -11,16 +13,23 @@ PINGU_VERSION := $(shell \
 		echo $(VERSION); \
 	fi)
 
-prefix = /usr
-localstatedir = /var
-rundir = $(localstatedir)/run
+prefix ?= /usr/local
+exec_prefix ?= $(prefix)
+bindir ?= $(exec_prefix)/bin
+sbindir ?= $(exec_prefix)/sbin
+sysconfdir ?= $(prefix)/etc
+localstatedir ?= $(prefix)/var
+libdir ?= $(exec_prefix)/lib
+datarootdir ?= $(prefix)/share
+mandir ?= $(datarootdir)/man
+
+rundir ?= $(localstatedir)/run
+
 pingustatedir = $(rundir)/pingu
 
 luasharedir = /usr/share/lua/5.1
 lualibdir = /usr/lib/lua/5.1
 
-BINDIR = $(prefix)/bin
-SBINDIR = $(prefix)/sbin
 DESTDIR ?=
 
 INSTALL = install
@@ -85,10 +94,10 @@ $(SUBDIRS):
 	$(MAKE) -C $@
 
 install: $(TARGETS)
-	$(INSTALLDIR) $(DESTDIR)/$(BINDIR) $(DESTDIR)/$(SBINDIR) \
+	$(INSTALLDIR) $(DESTDIR)/$(bindir) $(DESTDIR)/$(sbindir) \
 		$(DESTDIR)/$(pingustatedir)
-	$(INSTALL) $(BIN_TARGETS) $(DESTDIR)/$(BINDIR)
-	$(INSTALL) $(SBIN_TARGETS) $(DESTDIR)/$(SBINDIR)
+	$(INSTALL) $(BIN_TARGETS) $(DESTDIR)/$(bindir)
+	$(INSTALL) $(SBIN_TARGETS) $(DESTDIR)/$(sbindir)
 	for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir $@ || break; \
 	done
