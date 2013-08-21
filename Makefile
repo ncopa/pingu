@@ -5,12 +5,11 @@ BIN_TARGETS = mtu
 SBIN_TARGETS = pingu pinguctl
 
 TARGETS = $(BIN_TARGETS) $(SBIN_TARGETS) $(LUA_TARGETS)
-VERSION = 1.2
 PINGU_VERSION := $(shell \
 	if [ -d .git ]; then \
 		git describe --long; \
 	else \
-		echo $(VERSION); \
+		echo $(PACKAGE_VERSION); \
 	fi)
 
 prefix ?= /usr/local
