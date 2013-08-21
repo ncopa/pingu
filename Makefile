@@ -42,6 +42,7 @@ CFLAGS ?= -g
 CFLAGS += -DPINGU_VERSION=\"$(PINGU_VERSION)\"
 CFLAGS += -Wall -Wstrict-prototypes -D_GNU_SOURCE -std=gnu99
 CFLAGS += -DDEFAULT_PIDFILE=\"$(pingustatedir)/pingu.pid\"
+CFLAGS += -DDEFAULT_CONFIG=\"$(sysconfdir)/pingu/pingu.conf\"
 CFLAGS += -DDEFAULT_ADM_client=\"$(pingustatedir)/pingu.ctl\"
 
 pingu_OBJS = \
