@@ -20,6 +20,14 @@
 #include "pingu_netlink.h"
 #include "sockaddr_util.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#ifndef HAVE_STRLCPY
+#define	strlcpy(dst, src, dstsize)	snprintf(dst, dstsize, "%s", src)
+#endif
+
 static struct list_head iface_list = LIST_INITIALIZER(iface_list);
 
 #define PINGU_ROUTE_TABLE_MIN 1
