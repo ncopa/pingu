@@ -10,7 +10,7 @@ PINGU_VERSION := $(shell \
 
 export PINGU_VERSION
 
-SUBDIRS := man src
+SUBDIRS := src doc
 
 all: $(SUBDIRS)
 
