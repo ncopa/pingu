@@ -1,6 +1,2 @@
-pingu
-pinguctl
-mtu
 *.o
-client.so
 config.*

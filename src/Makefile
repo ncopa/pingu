@@ -25,18 +25,11 @@ INSTALL = install
 INSTALLDIR = $(INSTALL) -d
 PKG_CONFIG ?= pkg-config
 
-ifdef LUAPC
-LUA_TARGETS := client.so
-INSTALL_LUA_TARGET := install-lua
-LUA_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(LUAPC))
-LUA_VERSION ?= $(shell $(PKG_CONFIG) --variable V $(LUAPC))
-
-luasharedir := $(datarootdir)/lua/$(LUA_VERSION)
-lualibdir := $(libdir)/lua/$(LUA_VERSION)
-
-endif
-
 SUBDIRS :=
+
+ifdef LUAPC
+SUBDIRS += lua
+endif
 
 CFLAGS ?= -g
 CFLAGS += -I../
@@ -82,7 +75,7 @@ client.so_LDFLAGS = -shared
 
 ALL_OBJS= $(pingu_OBJS) $(pinguctl_OBJS) $(mtu_OBJS) $(client.so_OBJS)
 
-all: $(TARGETS)
+all: $(TARGETS) $(SUBDIRS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $($@_CFLAGS) -c $<
