@@ -32,7 +32,7 @@ INSTALL = install
 INSTALLDIR = $(INSTALL) -d
 PKG_CONFIG ?= pkg-config
 
-ifneq (LUAPC,)
+ifdef LUAPC
 LUA_TARGETS := client.so
 INSTALL_LUA_TARGET := install-lua
 LUA_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(LUAPC))
