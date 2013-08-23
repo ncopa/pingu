@@ -22,7 +22,7 @@ void execute_action(const char *action)
 {
 	pid_t pid;
 	const char *shell;
-	
+
 	if (action == NULL)
 		return;
 
@@ -127,7 +127,7 @@ int pingu_host_init(struct ev_loop *loop)
 	struct pingu_host *host;
 	list_for_each_entry(host, &host_list, host_list_entry) {
 		if (host->label == NULL)
-			host->label = host->host;
+			host->label = strdup(host->host);
 		ev_timer_init(&host->burst_timeout_watcher,
 			      pingu_burst_timeout_cb, 1.0, host->burst_interval);
 		ev_timer_start(loop, &host->burst_timeout_watcher);
