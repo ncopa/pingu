@@ -134,6 +134,13 @@ static int pingu_conf_parse_int(struct pingu_conf *conf, const char *str,
 	return 0;
 }
 
+static int pingu_conf_keyword_error(struct pingu_conf *conf, const char *key)
+{
+	log_error("%s: Unknown keyword '%s' (line %i)", conf->filename,
+		  key, conf->lineno);
+	return -1;
+}
+
 static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 {
 	struct pingu_iface *iface;
@@ -142,8 +149,8 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 
 	iface = pingu_iface_get_by_name(ifname);
 	if (iface != NULL) {
-		log_error("Interface %s already declared (line %i)", ifname,
-			  conf->lineno);
+		log_error("%s: Interface %s already declared (line %i)",
+			  conf->filename, ifname, conf->lineno);
 		return -1;
 	}
 
@@ -179,9 +186,11 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 				err = pingu_conf_parse_int(conf, value,
 							   &weight);
 				if (!err && (weight <= 0 || weight > 256)) {
-					log_error("Invalid load-balance weight %i on line %i",
-						  weight, conf->lineno);
-					r++;
+					log_error("%s: Invalid load-balance "
+					          "weight %i (line %i)",
+						  conf->filename, weight,
+						  conf->lineno);
+					r--;
 				}
 				r += err;
 			}
@@ -192,8 +201,7 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		} else if (strcmp(key, "fwmark") == 0) {
 			r += pingu_conf_parse_int(conf, value, &iface->fwmark);
 		} else {
-			log_error("Unknown keyword '%s' on line %i", key,
-				  conf->lineno);
+			r += pingu_conf_keyword_error(conf, key);
 		}
 	}
 	return r;
@@ -211,8 +219,8 @@ static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 		if (strcmp(key, "bind-interface") == 0) {
 			host->iface = pingu_iface_get_by_name_or_new(value);
 			if (host->iface == NULL) {
-				log_error("Undefined interface %s on line %i",
-					   value, conf->lineno);
+				log_error("%s: Interface failure %s (line %i)",
+					  conf->filename, value, conf->lineno);
 				return -1;
 			}
 		} else if (strcmp(key, "label") == 0) {
@@ -232,8 +240,7 @@ static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 		} else if (strcmp(key, "interval") == 0) {
 			host->burst_interval = atof(value);
 		} else {
-			log_error("Unknown keyword '%s' on line %i", key,
-				  conf->lineno);
+			r += pingu_conf_keyword_error(conf, key);
 		}
 	}
 	if (host->iface == NULL)
@@ -274,10 +281,7 @@ int pingu_conf_parse(const char *filename)
 		} else if (strcmp(key, "down-action") == 0) {
 			default_down_action = xstrdup(value);
 		} else {
-			log_error("Unknown keyword '%s' on line %i", key,
-				  conf->lineno);
-			r = -1;
-			break;
+			r += pingu_conf_keyword_error(conf, key);
 		}
 	}
 	pingu_conf_close(conf);
