@@ -153,7 +153,11 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		if (key == NULL || key[0] == '}')
 			break;
 		if (strcmp(key, "route-table") == 0) {
-			pingu_iface_set_route_table(iface, atoi(value));
+			int status, n;
+			status = parse_int(value, &n, conf->lineno);
+			if (status == 0)
+				pingu_iface_set_route_table(iface, n);
+			r += status;
 		} else if (strcmp(key, "label") == 0) {
 			iface->label = xstrdup(value);
 		} else if (strcmp(key, "gateway-up-action") == 0) {
