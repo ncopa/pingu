@@ -118,10 +118,25 @@ static struct pingu_host *pingu_conf_new_host(const char *hoststr)
 			      default_down_action);
 }
 
+static int parse_int(const char *str, int *i, int lineno)
+{
+	const char *fmt = "%d";
+	int r;
+	if (str[0] == '0' && str[1] == 'x')
+		fmt = "%x";
+	r = sscanf(str, fmt, i);
+	if (r != 1) {
+		log_error("Invalid integer value '%s' (line %i)", str, lineno);
+		return -1;
+	}
+	return 0;
+}
+
 static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 {
 	struct pingu_iface *iface;
 	char *key, *value;
+	int r = 0;
 
 	iface = pingu_iface_get_by_name(ifname);
 	if (iface != NULL) {
@@ -164,13 +179,13 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 			struct pingu_host *host = pingu_conf_new_host(value);
 			host->iface = iface;
 		} else if (strcmp(key, "fwmark") == 0) {
-			iface->fwmark = atoi(value);
+			r += parse_int(value, &iface->fwmark, conf->lineno);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  conf->lineno);
 		}
 	}
-	return 0;
+	return r;
 }
 
 static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
