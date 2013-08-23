@@ -1,0 +1,130 @@
+PINGU.CONF(5)
+=============
+:doctype: manpage
+
+
+NAME
+----
+pingu.conf - pingu daemon configuration file
+
+
+DESCRIPTION
+-----------
+The file can contain 3 different contexts: Global context, interface context
+and host context.
+
+Blank lines and lines starting with # are ignored.
+
+
+GLOBAL CONTEXT
+--------------
+The config file starts in global context. In this section the default values
+for the keywords used in interface on hosts sections are set. Values set in
+global context can be overridden in interface and host sections.
+
+*interval*::
+Set the default ping burst interval
+
+*timeout*::
+	The default ping timout value in seconds. If the ping response does
+	not come back within "timeout" seconds the ping is considered lost.
+
+*required*::
+	The minimum required ping responses of a burst to consider the host
+	online.
+
+*retries*::
+	Maximum sent ping packets for a burst.
+
+*up-action*::
+	The default action to execute when a ping host goes online.
+
+*down-action*::
+	The default action to execute when a ping host goes offline.
+
+
+INTERFACE CONTEXT
+-----------------
+Example:
+....
+interface eth0 {
+	keyword value
+	...
+}
+....
+
+
+The keywords valid in an interface sections are:
+
+*gateway-down-action*::
+	Execute this action when a gateway is considered offline.
+
+*gateway-up-action*::
+	Execute this action when a gateway is considered online.
+
+*label*::
+	A user defined label that will be used in logs and by pinguctl.
+
+*load-balance*::
+	Enable balancing for this interface. A minimum of two interfaces need
+	to be configured in order for load-balancing to work. An optional
+	weight value can be given.
+
+*required-hosts-online*::
+	The minimum number of ping hosts that needs to be online to consider
+	the gateway online.
+
+*route-table*::
+	The alternate route table for this interface.
+
+*rule-priority*::
+	The preference value for the ip rule.
+
+*ping*::
+	Host to ping to verify that gateway is still up. This is the same as
+	defining a host and bind it to interface.
+
+*fwmark*::
+	Add an additional route rule for configured fwmark integer.
+
+
+HOST CONTEXT
+------------
+Example:
+....
+host 1.2.3.4 {
+	keyword value
+	...
+}
+....
+
+*bind-interface*::
+	Bind the pings to this interface.
+
+*down-action*::
+	Execute this action when ping host goes offline.
+
+*interval*::
+	The interval for ping bursts.
+
+*label*::
+	A label to be used in logs and pinguctl.
+
+*required*::
+	The number of required ping responses to consider host online.
+
+*retry*::
+	The maximum number of retries for a ping burst.
+
+*timeout*::
+	The ping response timeout value in seconds. If no ping response
+	returns within this value the ping is considered lost.
+
+*up-action*::
+	Execute this action when a ping host goes online
+
+
+AUTHORS
+-------
+Natanael Copa
+

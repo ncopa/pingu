@@ -1,0 +1,47 @@
+PINGUCTL(8)
+===========
+:doctype: manpage
+
+
+NAME
+----
+pinguctl - pingu administration client
+
+
+SYNOPSIS
+--------
+*pinguctl* [*-a* 'SOCKETPATH'] command
+
+
+DESCRIPTION
+-----------
+Connects to a running pingu daemon and query status information.
+
+
+OPTIONS
+-------
+*-a* 'SOCKETPATH'::
+	Use SOCKETPATH as administration socket instead of the default
+	'@DEFAULT_ADM_SOCKET@'
+
+
+COMMANDS
+--------
+The following commands are valid:
+
+*gateway-status*::
+	Show the status of the gateways.
+
+*host-status*::
+	Show the status of the hosts.
+
+
+FILES
+-----
+@DEFAULT_ADM_SOCKET@
+
+
+AUTHORS
+-------
+Natanael Copa
+
