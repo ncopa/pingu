@@ -200,6 +200,7 @@ static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 {
 	char *key, *value;
 	struct pingu_host *host = pingu_conf_new_host(hoststr);
+	int r = 0;
 
 	while (pingu_conf_read_key_value(conf, &key, &value)) {
 		if (key == NULL || key[0] == '}')
@@ -218,9 +219,10 @@ static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 		} else if (strcmp(key, "down-action") == 0) {
 			host->down_action = xstrdup(value);
 		} else if (strcmp(key, "retry") == 0) {
-			host->max_retries = atoi(value);
+			r += parse_int(value, &host->max_retries, conf->lineno);
 		} else if (strcmp(key, "required") == 0) {
-			host->required_replies = atoi(value);
+			r += parse_int(value, &host->required_replies,
+				       conf->lineno);
 		} else if (strcmp(key, "timeout") == 0) {
 			host->timeout = atof(value);
 		} else if (strcmp(key, "interval") == 0) {
@@ -232,7 +234,7 @@ static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 	}
 	if (host->iface == NULL)
 		host->iface = pingu_iface_get_by_name_or_new(NULL);
-	return 0;
+	return r;
 }
 
 int pingu_conf_parse(const char *filename)
@@ -246,19 +248,21 @@ int pingu_conf_parse(const char *filename)
 
 	while (pingu_conf_read_key_value(conf, &key, &value)) {
 		if (strcmp(key, "interface") == 0) {
-			r = pingu_conf_read_iface(conf, chomp_bracket(value));
+			r += pingu_conf_read_iface(conf, chomp_bracket(value));
 			if (r < 0)
 				break;
 		} else if (strcmp(key, "host") == 0) {
-			r = pingu_conf_read_host(conf, chomp_bracket(value));
+			r += pingu_conf_read_host(conf, chomp_bracket(value));
 			if (r < 0)
 				break;
 		} else if (strcmp(key, "interval") == 0) {
 			default_burst_interval = atof(value);
 		} else if (strcmp(key, "retry") == 0) {
-			default_max_retries = atoi(value);
+			r += parse_int(value, &default_max_retries,
+				       conf->lineno);
 		} else if (strcmp(key, "required") == 0) {
-			default_required_replies = atoi(value);
+			r += parse_int(value, &default_required_replies,
+				       conf->lineno);
 		} else if (strcmp(key, "timeout") == 0) {
 			default_timeout = atof(value);
 		} else if (strcmp(key, "up-action") == 0) {
