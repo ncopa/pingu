@@ -173,12 +173,14 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		} else if (strcmp(key, "load-balance") == 0) {
 			int weight = 0;
 			if (value != NULL) {
-				weight = atoi(value);
-				if (weight <= 0 || weight > 256) {
+				int err;
+				err = parse_int(value, &weight, conf->lineno);
+				if (!err && (weight <= 0 || weight > 256)) {
 					log_error("Invalid load-balance weight %i on line %i",
 						  weight, conf->lineno);
-					return -1;
+					r++;
 				}
+				r += err;
 			}
 			pingu_iface_set_balance(iface, weight);
 		} else if (strcmp(key, "ping") == 0) {
