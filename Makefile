@@ -10,7 +10,11 @@ PINGU_VERSION := $(shell \
 
 export PINGU_VERSION
 
-SUBDIRS := src doc
+SUBDIRS := src
+
+ifdef ENABLE_DOC
+SUBDIRS += doc
+endif
 
 all: $(SUBDIRS)
 

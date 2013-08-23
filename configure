@@ -57,6 +57,7 @@ Optional features:
   --enable-warnings       build with recommended warnings flags [enabled]
   --enable-werror         build with -Werror [disabled]
   --enable-lua            build Lua client binding [disabled]
+  --disable-doc           do not build manual pages [enabled]
   --with-luapc=LUAPC      build Lua client binding, using LUAPC pkg-config
                           package [disabled]
 
@@ -86,6 +87,7 @@ enable_debug=false
 enable_warnings=true
 enable_werror=false
 enable_lua=false
+enable_doc=true
 
 for arg; do
 case "$arg" in
@@ -105,6 +107,8 @@ case "$arg" in
 --disable-warnings) enable_warnings=false ;;
 --enable-werror) enable_werror=true ;;
 --disable-werror) enable_werror=false ;;
+--enable-doc) enable_doc=true ;;
+--disable-doc) enable_doc=false ;;
 --with-luapc=*) with_luapc=${arg#*=};;
 -* ) die "$0: unknown option $arg" ;;
 CC=*) CC=${arg#*=} ;;
@@ -119,12 +123,20 @@ if $enable_debug; then
 	CFLAGS="$CFLAGS -g"
 fi
 
+echo -n "Checking for -Wall: "
 if $enable_warnings; then
 	CFLAGS="$CFLAGS -Wall"
+	echo "yes"
+else
+	echo "no"
 fi
 
+echo -n "Checking for -Werror: "
 if $enable_werror; then
 	CFLAGS="$CFLAGS -Werror"
+	echo "yes"
+else
+	echo "no"
 fi
 
 echo -n "Checking for Lua support: "
@@ -152,6 +164,14 @@ if compile_prog "" ""; then
 	echo yes
 else
 	echo no
+fi
+
+echo -n "Checking if documentation should be built: "
+if $enable_doc; then
+	echo "yes"
+	ENABLE_DOC=1
+else
+	echo "no"
 fi
 
 # generate config.h
@@ -194,6 +214,7 @@ mandir
 LUAPC
 CC
 CFLAGS
+ENABLE_DOC
 LDFLAGS
 PACKAGE
 PACKAGE_VERSION
