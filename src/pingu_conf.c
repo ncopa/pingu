@@ -118,7 +118,8 @@ static struct pingu_host *pingu_conf_new_host(const char *hoststr)
 			      default_down_action);
 }
 
-static int parse_int(const char *str, int *i, int lineno)
+static int pingu_conf_parse_int(struct pingu_conf *conf, const char *str,
+				int *i)
 {
 	const char *fmt = "%d";
 	int r;
@@ -126,7 +127,8 @@ static int parse_int(const char *str, int *i, int lineno)
 		fmt = "%x";
 	r = sscanf(str, fmt, i);
 	if (r != 1) {
-		log_error("Invalid integer value '%s' (line %i)", str, lineno);
+		log_error("%s: Invalid integer value '%s' (line %i)",
+			  conf->filename, str, conf->lineno);
 		return -1;
 	}
 	return 0;
@@ -153,11 +155,11 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		if (key == NULL || key[0] == '}')
 			break;
 		if (strcmp(key, "route-table") == 0) {
-			int status, n;
-			status = parse_int(value, &n, conf->lineno);
-			if (status == 0)
+			int err, n;
+			err = pingu_conf_parse_int(conf, value, &n);
+			if (err == 0)
 				pingu_iface_set_route_table(iface, n);
-			r += status;
+			r += err;
 		} else if (strcmp(key, "label") == 0) {
 			iface->label = xstrdup(value);
 		} else if (strcmp(key, "gateway-up-action") == 0) {
@@ -165,16 +167,17 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		} else if (strcmp(key, "gateway-down-action") == 0) {
 			iface->gw_down_action = xstrdup(value);
 		} else if (strcmp(key, "required-hosts-online") == 0) {
-			r += parse_int(value, &iface->required_hosts_online,
-				       conf->lineno);
+			r += pingu_conf_parse_int(conf, value,
+						 &iface->required_hosts_online);
 		} else if (strcmp(key, "rule-priority") == 0) {
-			r += parse_int(value, &iface->rule_priority,
-				       conf->lineno);
+			r += pingu_conf_parse_int(conf, value,
+						  &iface->rule_priority);
 		} else if (strcmp(key, "load-balance") == 0) {
 			int weight = 0;
 			if (value != NULL) {
 				int err;
-				err = parse_int(value, &weight, conf->lineno);
+				err = pingu_conf_parse_int(conf, value,
+							   &weight);
 				if (!err && (weight <= 0 || weight > 256)) {
 					log_error("Invalid load-balance weight %i on line %i",
 						  weight, conf->lineno);
@@ -187,7 +190,7 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 			struct pingu_host *host = pingu_conf_new_host(value);
 			host->iface = iface;
 		} else if (strcmp(key, "fwmark") == 0) {
-			r += parse_int(value, &iface->fwmark, conf->lineno);
+			r += pingu_conf_parse_int(conf, value, &iface->fwmark);
 		} else {
 			log_error("Unknown keyword '%s' on line %i", key,
 				  conf->lineno);
@@ -219,10 +222,11 @@ static int pingu_conf_read_host(struct pingu_conf *conf, char *hoststr)
 		} else if (strcmp(key, "down-action") == 0) {
 			host->down_action = xstrdup(value);
 		} else if (strcmp(key, "retry") == 0) {
-			r += parse_int(value, &host->max_retries, conf->lineno);
+			r += pingu_conf_parse_int(conf, value,
+						  &host->max_retries);
 		} else if (strcmp(key, "required") == 0) {
-			r += parse_int(value, &host->required_replies,
-				       conf->lineno);
+			r += pingu_conf_parse_int(conf, value,
+						  &host->required_replies);
 		} else if (strcmp(key, "timeout") == 0) {
 			host->timeout = atof(value);
 		} else if (strcmp(key, "interval") == 0) {
@@ -258,11 +262,11 @@ int pingu_conf_parse(const char *filename)
 		} else if (strcmp(key, "interval") == 0) {
 			default_burst_interval = atof(value);
 		} else if (strcmp(key, "retry") == 0) {
-			r += parse_int(value, &default_max_retries,
-				       conf->lineno);
+			r += pingu_conf_parse_int(conf, value,
+						  &default_max_retries);
 		} else if (strcmp(key, "required") == 0) {
-			r += parse_int(value, &default_required_replies,
-				       conf->lineno);
+			r += pingu_conf_parse_int(conf, value,
+						  &default_required_replies);
 		} else if (strcmp(key, "timeout") == 0) {
 			default_timeout = atof(value);
 		} else if (strcmp(key, "up-action") == 0) {
