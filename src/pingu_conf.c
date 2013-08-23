@@ -165,9 +165,11 @@ static int pingu_conf_read_iface(struct pingu_conf *conf, char *ifname)
 		} else if (strcmp(key, "gateway-down-action") == 0) {
 			iface->gw_down_action = xstrdup(value);
 		} else if (strcmp(key, "required-hosts-online") == 0) {
-			iface->required_hosts_online = atoi(value);
+			r += parse_int(value, &iface->required_hosts_online,
+				       conf->lineno);
 		} else if (strcmp(key, "rule-priority") == 0) {
-			iface->rule_priority = atoi(value);
+			r += parse_int(value, &iface->rule_priority,
+				       conf->lineno);
 		} else if (strcmp(key, "load-balance") == 0) {
 			int weight = 0;
 			if (value != NULL) {
