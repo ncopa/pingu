@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PACKAGE=pingu
-PACKAGE_VERSION=1.3
+PACKAGE_VERSION=1.4
 
 TMPDIR=${TMPDIR:-${TEMPDIR:-/tmp}}
 TMPC="$TMPDIR/$PACKAGE-conf-$$.c"
