@@ -183,7 +183,8 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 		 * futher down the road.
 		 */
 		if (is_default_gw(gw) && !pingu_iface_gw_is_online(iface)) {
-			pingu_iface_update_routes(iface, RTM_DELROUTE);
+			pingu_iface_update_routes(iface, RTM_DELROUTE,
+						  load_balanced > 1);
 			/* avoid doing the multipath twice*/
 			return;
 		}
@@ -197,14 +198,15 @@ void pingu_iface_gw_action(struct pingu_iface *iface,
 		kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
 }
 
-void pingu_iface_update_routes(struct pingu_iface *iface, int action)
+void pingu_iface_update_routes(struct pingu_iface *iface, int action,
+			       int do_multipath)
 {
 	struct pingu_route *route;
 	list_for_each_entry(route, &iface->route_list, route_list_entry) {
 		if (is_default_gw(route) && iface->has_address)
 			kernel_route_modify(action, route, RT_TABLE_MAIN);
 	}
-	if (load_balanced > 1)
+	if (do_multipath)
 		kernel_route_multipath(RTM_NEWROUTE, &iface_list, RT_TABLE_MAIN);
 }
 
@@ -238,7 +240,7 @@ void pingu_iface_adjust_hosts_online(struct pingu_iface *iface, int adjustment)
 
 	log_info("%s: went %s", iface->label ? iface->label : iface->name,
 		 statusstr);
-	pingu_iface_update_routes(iface, route_action);
+	pingu_iface_update_routes(iface, route_action, load_balanced > 1);
 	execute_action(action);
 }
 
@@ -326,6 +328,9 @@ void pingu_iface_cleanup(struct ev_loop *loop)
 	}
 
 	list_for_each_entry(iface, &iface_list, iface_list_entry) {
+		/* restore main route table */
+		if (!pingu_iface_gw_is_online(iface))
+			pingu_iface_update_routes(iface, RTM_NEWROUTE, 0);
 		kernel_cleanup_iface_routes(iface);
 		close(iface->fd);
 	}

@@ -45,7 +45,7 @@ int usage(const char *program)
 		"options:\n"
 		" -a  Use administration socket ADMSOCKET (default is "
 			DEFAULT_ADM_SOCKET ")\n"
-       		" -c  Read configuration from CONFIG (default is "
+		" -c  Read configuration from CONFIG (default is "
 			DEFAULT_CONFIG ")\n"
 		" -d  Fork to background (damonize)\n"
 		" -h  Show this help\n"
