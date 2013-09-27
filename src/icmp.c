@@ -3,17 +3,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <asm/types.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <sys/types.h>
 
 #include "icmp.h"
 
 static char *pr_addr(__u32 addr)
 {
-	struct hostent *hp;
 	static char buf[4096];
 
 	sprintf(buf, "%s", inet_ntoa(*(struct in_addr *)&addr));
@@ -273,7 +274,6 @@ int icmp_send_frag_needed(int fd, struct sockaddr *to, int tolen,
 int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 		   int seq, int total_size)
 {
-	struct sockaddr_in *to_in = (struct sockaddr_in *) to;
 	__u8 packet[1500];
 	struct icmphdr *icp;
 	int len;
@@ -300,10 +300,9 @@ int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 	return icmp_send(fd, to, tolen, (void *) packet, len);
 }
 
-int icmp_read_reply(int fd, struct sockaddr *from, int fromlen,
+int icmp_read_reply(int fd, struct sockaddr *from, unsigned int fromlen,
 		    __u8 *buf, int buflen)
 {
-	struct iovec iov;
 	int len;
 
 	len = recvfrom(fd, buf, buflen, 0, from, &fromlen);
@@ -318,7 +317,7 @@ int icmp_read_reply(int fd, struct sockaddr *from, int fromlen,
 
 int icmp_open(float timeout)
 {
-	const int pmtudisc = IP_PMTUDISC_DO, yes = 1;
+	const int pmtudisc = IP_PMTUDISC_DO;
 	struct timeval tv;
 	int fd;
 

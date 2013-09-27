@@ -9,7 +9,13 @@
 #include <linux/sockios.h>
 #include <netinet/ip_icmp.h>
 
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "icmp.h"
+#include "netlink.h"
 
 static int fd, mtu_size;
 static struct sockaddr_in to;
@@ -128,7 +134,7 @@ static int set_mtu(const char *dev, int mtu)
 		return -1;
 	}
 	close(fd);
-	return 0; 
+	return 0;
 }
 
 static void do_discover_and_write(void)
@@ -142,7 +148,7 @@ static void do_discover_and_write(void)
 		return;
 	}
 
-	if (!netlink_route_get(&to, NULL, iface)) {
+	if (!netlink_route_get((struct sockaddr *)&to, NULL, iface)) {
 		fprintf(stderr, "Failed to determine route interface\n");
 		return;
 	}
@@ -184,7 +190,7 @@ static void do_inject_pmtu(void)
 {
 	u_int16_t mtu;
 
-	if (!netlink_route_get(&to, &mtu, NULL)) {
+	if (!netlink_route_get((struct sockaddr *)&to, &mtu, NULL)) {
 		fprintf(stderr, "Failed to determine Path MTU\n");
 		return;
 	}
