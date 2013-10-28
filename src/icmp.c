@@ -1,3 +1,4 @@
+#include <time.h>
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -5,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <asm/types.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
@@ -300,7 +301,7 @@ int icmp_send_ping(int fd, struct sockaddr *to, int tolen,
 	return icmp_send(fd, to, tolen, (void *) packet, len);
 }
 
-int icmp_read_reply(int fd, struct sockaddr *from, unsigned int fromlen,
+int icmp_read_reply(int fd, struct sockaddr *from, socklen_t fromlen,
 		    __u8 *buf, int buflen)
 {
 	int len;

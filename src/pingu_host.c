@@ -37,7 +37,7 @@ void execute_action(const char *action)
 		return;
 	}
 	if (pid == 0) {
-		execl(shell, shell, "-c", action, NULL);
+		execl(shell, shell, "-c", action, (void*) NULL);
 		log_perror(action);
 		exit(1);
 	}

@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include <linux/if.h>
 #include <linux/sockios.h>
+
+#include <arpa/inet.h>
 #include <netinet/ip_icmp.h>
 
 #include <sys/ioctl.h>
