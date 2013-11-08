@@ -13,3 +13,12 @@ Features
 - Optional route rule based on fwmark
 - run script when ISP goes up/down
 
+
+Build requirements
+------------------
+- libev 3 or newer (http://software.schmorp.de/pkg/libev.html)
+- asciidoc (optional for creating man pages)
+
+To build pingu without man pages run configure --disable-doc
+
+
