@@ -29,6 +29,13 @@
 #define DEFAULT_PIDFILE "/var/run/pingu/pingu.pid"
 #endif
 
+/* libev 3 compat */
+#if EV_VERSION_MAJOR < 4
+#define EVBREAK_ALL EVUNLOOP_ALL
+#define ev_run ev_loop
+#define ev_break ev_unloop
+#endif
+
 int pingu_verbose = 0, pid_file_fd = 0, pingu_daemonize = 0;
 char *pid_file = DEFAULT_PIDFILE;
 
