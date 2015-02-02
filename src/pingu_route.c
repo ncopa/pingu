@@ -40,6 +40,7 @@ static struct pingu_route *pingu_route_clone(struct pingu_route *gw)
 	new_gw->protocol = gw->protocol;
 	new_gw->scope = gw->scope;
 	new_gw->type = gw->type;
+	new_gw->dev_index = gw->dev_index;
 	return new_gw;
 }
 
