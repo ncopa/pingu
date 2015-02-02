@@ -32,6 +32,7 @@ static struct pingu_route *pingu_route_clone(struct pingu_route *gw)
 		return NULL;
 	}
 	/* copy the fields without overwriting the list entry */
+	memcpy(&new_gw->src, &gw->src, sizeof(new_gw->src));
 	memcpy(&new_gw->dest, &gw->dest, sizeof(new_gw->dest));
 	memcpy(&new_gw->gw_addr, &gw->gw_addr, sizeof(new_gw->gw_addr));
 	new_gw->dst_len = gw->dst_len;
