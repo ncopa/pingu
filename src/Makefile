@@ -54,7 +54,8 @@ pingu_OBJS = \
 	sockaddr_util.o \
 	xlib.o
 
-pingu_LIBS = -lev
+pingu_CFLAGS = $(LIBEV_CFLAGS)
+pingu_LIBS = $(LIBEV_LIBS)
 
 pinguctl_OBJS = \
 	log.o \
