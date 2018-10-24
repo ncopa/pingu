@@ -258,7 +258,6 @@ int icmp_send_frag_needed(int fd, struct sockaddr *to, int tolen,
 	icp->type = ICMP_DEST_UNREACH;
 	icp->code = ICMP_FRAG_NEEDED;
 	icp->checksum = 0;
-	icp->un.frag.__unused = 0;
 	icp->un.frag.mtu = htons(newmtu);
 
 	/* copy ip header + 64-bits of original packet */
