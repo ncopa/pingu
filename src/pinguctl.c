@@ -71,15 +71,17 @@ int main(int argc, char *argv[])
 			socket_path = optarg;
 			break;
 		}
-		argc -= optind;
-		argv += optind;
 	}
+
+	argc -= optind;
+	argv += optind;
+
 	log_init("pinguctl", 0);
 	fd = adm_init(socket_path);
 	if (fd < 0)
 		return 1;
 
-	for (i = 1; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		if (adm_send_cmd(fd, argv[i]) < 0 || adm_recv(fd) < 0)
 			return 1;
 	}
