@@ -45,8 +45,8 @@ void execute_action(const char *action)
 
 int pingu_host_set_status(struct pingu_host *host, int status)
 {
-	const char *action, *statusstr = "";
-	int adjustment;
+	const char *action = NULL, *statusstr = "";
+	int adjustment = 0;
 	host->burst.active = 0;
 	if (host->status == status) {
 		log_debug("%s: status is still %i", host->label, status);
