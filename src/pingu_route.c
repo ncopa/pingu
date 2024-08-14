@@ -48,7 +48,7 @@ static struct pingu_route *pingu_route_clone(struct pingu_route *gw)
 char *pingu_route_to_string(struct pingu_route *route,
 			    char *buf, size_t bufsize)
 {
-	char deststr[64] = "", gwstr[64] = "", viastr[68] = "";
+	char deststr[64] = "", gwstr[64] = "", viastr[70] = "";
 	char ifname[IF_NAMESIZE] = "", devstr[IF_NAMESIZE + 5] = "";
 
 	sockaddr_to_string(&route->dest, deststr, sizeof(deststr));
@@ -154,7 +154,7 @@ void pingu_route_dump(int fd, struct list_head *route_list)
 		char str[512] = "";
 		pingu_route_to_string(entry, str, sizeof(str));
 		if (str[0] != '\0') {
-			strncat(str, "\n", sizeof(str));
+			strncat(str, "\n", sizeof(str) - 1);
 			write(fd, str, strlen(str));
 		}
 	}
